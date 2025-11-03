@@ -1,0 +1,24 @@
+# --- Secrets ---
+# NEVER commit plaintext secrets, tokens, or keys.
+*.key
+*.token
+secret*.yaml
+secrets.yaml
+
+# --- Terraform ---
+# Your Terraform plan will live in a different repo,
+# but it's good practice to have this here just in case.
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+
+# --- Kubeconfigs ---
+# NEVER commit kubeconfig files.
+kubeconfig
+*.kubeconfig
+
+# --- OS / Editor ---
+.DS_Store
+.vscode/
+.idea/
