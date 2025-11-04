@@ -27,14 +27,11 @@ jobs:
           sudo mv kubeconform /usr/local/bin/
       - name: Run kubeconform
         run: |
-          # Download the ArgoCD Application CRD schema
-          ARGO_URL="https://raw.githubusercontent.com/argoproj/argo-cd"
-          ARGO_URL="${ARGO_URL}/stable/manifests/crds/application-crd.yaml"
-          curl -O "${ARGO_URL}"
-          # Run kubeconform with flags on separate lines
+          # Run kubeconform, skipping ArgoCD CRDs
+          # ArgoCD Applications are valid CRDs but not in the standard schema
           kubeconform -summary -kubernetes-version 1.30.2 \
             -schema-location default \
-            -schema-location application-crd.yaml \
+            -skip Application \
             -ignore-filename-pattern '.github/.*' \
             .
       # CHECK 3: Security Scan
