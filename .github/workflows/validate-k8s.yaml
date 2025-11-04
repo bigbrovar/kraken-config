@@ -1,3 +1,4 @@
+---
 name: Validate Kubernetes Manifests
 
 on:
@@ -24,7 +25,8 @@ jobs:
       # --- CHECK 2: Kubernetes Schema Validation ---
       - name: Set up kubeconform
         run: |
-          curl -Lo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.6/kubeconform-linux-amd64.tar.gz
+          curl -Lo kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.6/kubeconform-linux-amd64.tar.gz
           tar xf kubeconform.tar.gz
           sudo mv kubeconform /usr/local/bin/
 
@@ -36,7 +38,8 @@ jobs:
       # --- CHECK 3: Security & Misconfiguration Scan ---
       - name: Set up Trivy
         run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
+          sh -s -- -b /usr/local/bin
 
       - name: Run Trivy
         # This scans your manifests for security issues

@@ -1,3 +1,4 @@
+---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -11,15 +12,15 @@ metadata:
 spec:
   # This app is part of the "default" project in ArgoCD
   project: default
-  
+
   source:
     # Use the official HashiCorp Helm chart repository
     repoURL: 'https://helm.releases.hashicorp.com'
     # The name of the chart to install
     chart: vault
     # A recent, stable version of the chart
-    targetRevision: 1.27.0 
-    
+    targetRevision: 1.27.0
+
     # Helm values to configure Vault for our homelab
     helm:
       values: |
@@ -30,13 +31,13 @@ spec:
         global:
           enabled: true
           tlsDisable: true # Disables TLS; we'll add our own Ingress later
-        
+
         server:
           enabled: true
           # This runs it in "dev" mode
           dev:
             enabled: true
-        
+
         # We don't need these extra components for our basic setup
         injector:
           enabled: false
@@ -49,13 +50,13 @@ spec:
   destination:
     server: 'https://kubernetes.default.svc' # This means the local cluster
     namespace: vault # We'll put Vault in its own "vault" namespace
-  
+
   # This is our GitOps sync policy
   syncPolicy:
     automated:
       prune: true    # Clean up old components
       selfHeal: true # Fix any manual changes
-    
+
     # This tells ArgoCD to create the "vault" namespace for us
     syncOptions:
       - CreateNamespace=true
