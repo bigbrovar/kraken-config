@@ -35,7 +35,7 @@ jobs:
           kubeconform -summary -kubernetes-version 1.30.2 \
             -schema-location default \
             -schema-location application-crd.yaml \
-            -ignore .github/ \
+            -ignore-filename-pattern '.github/.*' \
             .
       # CHECK 3: Security Scan
       - name: Set up Trivy
