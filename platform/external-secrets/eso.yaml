@@ -11,17 +11,16 @@ metadata:
     - resources-finalizer.argoproj.io
 spec:
   project: default
-
   source:
     repoURL: 'https://charts.external-secrets.io'
     chart: external-secrets
-    # Use the newer, more secure version
     targetRevision: 0.19.1
-
     helm:
       values: |
         installCRDs: true
-
+        # Reduce CRD conversion webhook overhead
+        crds:
+          createAggregateRoles: false
         # Add tolerations for your master nodes
         tolerations:
         - key: "node-role.kubernetes.io/control-plane"
@@ -30,14 +29,14 @@ spec:
         - key: "node-role.kubernetes.io/master"
           operator: "Exists"
           effect: "NoSchedule"
-
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: external-secrets
-
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
+      - Replace=true
