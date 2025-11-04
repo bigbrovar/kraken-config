@@ -6,6 +6,8 @@ metadata:
   name: vault
   # Tells ArgoCD where this Application lives
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   # Ensures all components deleted if app deleted
   finalizers:
     - resources-finalizer.argoproj.io
