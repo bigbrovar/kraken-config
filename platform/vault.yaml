@@ -12,15 +12,13 @@ metadata:
 spec:
   # Part of the "default" project in ArgoCD
   project: default
-
   source:
     # Official HashiCorp Helm chart repository
-    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    repoURL: 'https://helm.releases.hashicorp.com'
     # The chart name to install
     chart: vault
     # Recent stable version
-    targetRevision: 1.27.0
-
+    targetRevision: 0.27.0
     # Helm values to configure Vault for homelab
     helm:
       values: |
@@ -29,13 +27,11 @@ spec:
         global:
           enabled: true
           tlsDisable: true
-
         server:
           enabled: true
           # Run in dev mode
           dev:
             enabled: true
-
         # Don't need these for basic setup
         injector:
           enabled: false
@@ -44,18 +40,15 @@ spec:
         ui:
           # We want the UI
           enabled: true
-
   # Where ArgoCD will deploy Vault
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: vault
-
   # GitOps sync policy
   syncPolicy:
     automated:
       prune: true  # Clean up old components
       selfHeal: true  # Fix manual changes
-
     # Create the vault namespace automatically
     syncOptions:
       - CreateNamespace=true

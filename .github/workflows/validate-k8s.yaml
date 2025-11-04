@@ -1,48 +1,54 @@
 ---
 name: Validate Kubernetes Manifests
-
 'on':
   pull_request:
   push:
     branches: [main]
   workflow_dispatch:
-
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       # CHECK 1: YAML Syntax
       - name: Set up yamllint
         run: pip install yamllint
-
       - name: Run yamllint
         run: yamllint .
-
       # CHECK 2: Kubernetes Schema Validation
       - name: Set up kubeconform
         run: |
-          curl -Lo kubeconform.tar.gz \
-            https://github.com/yannh/kubeconform/releases/download/v0.6.6/kubeconform-linux-amd64.tar.gz
+          # Break long line by using a variable
+          KUBEFORM_URL="https://github.com/yannh/kubeconform/releases/download"
+          KUBEFORM_URL="${KUBEFORM_URL}/v0.6.6/kubeconform-linux-amd64.tar.gz"
+          curl -Lo kubeconform.tar.gz "$KUBEFORM_URL"
           tar xf kubeconform.tar.gz
           sudo mv kubeconform /usr/local/bin/
-
       - name: Run kubeconform
-        run: kubeconform -summary -kubernetes-version 1.30.2 .
-
+        run: |
+          # Download the ArgoCD Application CRD schema
+          ARGO_URL="https://raw.githubusercontent.com/argoproj/argo-cd"
+          ARGO_URL="${ARGO_URL}/stable/manifests/crds/application-crd.yaml"
+          curl -O "${ARGO_URL}"
+          # Run kubeconform with flags on separate lines
+          kubeconform -summary -kubernetes-version 1.30.2 \
+            -schema-location default \
+            -schema-location application-crd.yaml \
+            -ignore .github/ \
+            .
       # CHECK 3: Security Scan
       - name: Set up Trivy
         run: |
-          TRIVY_URL="https://raw.githubusercontent.com"
-          TRIVY_URL="${TRIVY_URL}/aquasecurity/trivy/main"
-          TRIVY_URL="${TRIVY_URL}/contrib/install.sh"
-          curl -sfL "${TRIVY_URL}" | sh -s -- -b /usr/local/bin
-
+          # Break long lines by using variables
+          TRIVY_REPO="https://raw.githubusercontent.com"
+          TRIVY_REPO="${TRIVY_REPO}/aquasecurity/trivy/main"
+          TRIVY_INSTALL_SCRIPT="${TRIVY_REPO}/contrib/install.sh"
+          curl -sfL "${TRIVY_INSTALL_SCRIPT}" | sh -s -- -b /usr/local/bin
       - name: Run Trivy
-        run: >
-          trivy config
-          --exit-code 1
-          --severity HIGH,CRITICAL
-          .
+        run: |
+          # Break long command onto new lines
+          trivy config \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            .
