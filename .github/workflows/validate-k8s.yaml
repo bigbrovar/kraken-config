@@ -4,7 +4,7 @@ name: Validate Kubernetes Manifests
 on:
   pull_request:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -14,15 +14,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- CHECK 1: YAML Syntax ---
+      # CHECK 1: YAML Syntax
       - name: Set up yamllint
         run: pip install yamllint
 
       - name: Run yamllint
-        # This scans the whole repo for YAML syntax errors
+        # Scans the whole repo for YAML syntax errors
         run: yamllint .
 
-      # --- CHECK 2: Kubernetes Schema Validation ---
+      # CHECK 2: Kubernetes Schema Validation
       - name: Set up kubeconform
         run: |
           curl -Lo kubeconform.tar.gz \
@@ -31,17 +31,17 @@ jobs:
           sudo mv kubeconform /usr/local/bin/
 
       - name: Run kubeconform
-        # This validates all YAMLs against the official K8s schema for your version
-        # It's smart enough to find *only* the Kubernetes manifests
+        # Validates YAMLs against official K8s schema
+        # Smart enough to find only Kubernetes manifests
         run: kubeconform -summary -kubernetes-version 1.30.2 .
 
-      # --- CHECK 3: Security & Misconfiguration Scan ---
+      # CHECK 3: Security & Misconfiguration Scan
       - name: Set up Trivy
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
           sh -s -- -b /usr/local/bin
 
       - name: Run Trivy
-        # This scans your manifests for security issues
-        # It will fail (exit-code 1) if it finds any HIGH or CRITICAL issues
+        # Scans manifests for security issues
+        # Fails if HIGH or CRITICAL issues found
         run: trivy config --exit-code 1 --severity HIGH,CRITICAL .

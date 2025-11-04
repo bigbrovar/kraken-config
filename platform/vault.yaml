@@ -1,62 +1,47 @@
 ---
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  # This is the name for the app card in the ArgoCD UI
-  name: vault
-  # This tells ArgoCD where this Application manifest lives
-  namespace: argocd
-  # This ensures all of Vault's components are deleted if we delete this app
-  finalizers:
-    - resources-finalizer.argoproj.io
-spec:
-  # This app is part of the "default" project in ArgoCD
-  project: default
+name: Validate Kubernetes Manifests
 
-  source:
-    # Use the official HashiCorp Helm chart repository
-    repoURL: 'https://helm.releases.hashicorp.com'
-    # The name of the chart to install
-    chart: vault
-    # A recent, stable version of the chart
-    targetRevision: 1.27.0
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-    # Helm values to configure Vault for our homelab
-    helm:
-      values: |
-        # This is the most important part for a homelab
-        # It runs Vault in "dev" mode, which is lightweight,
-        # auto-unseals, and uses in-memory storage.
-        # This is for learning and IS NOT for production.
-        global:
-          enabled: true
-          tlsDisable: true # Disables TLS; we'll add our own Ingress later
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-        server:
-          enabled: true
-          # This runs it in "dev" mode
-          dev:
-            enabled: true
+      # CHECK 1: YAML Syntax
+      - name: Set up yamllint
+        run: pip install yamllint
 
-        # We don't need these extra components for our basic setup
-        injector:
-          enabled: false
-        csi:
-          enabled: false
-        ui:
-          enabled: true # We want the UI
+      - name: Run yamllint
+        # Scans the whole repo for YAML syntax errors
+        run: yamllint .
 
-  # This is where ArgoCD will deploy Vault
-  destination:
-    server: 'https://kubernetes.default.svc' # This means the local cluster
-    namespace: vault # We'll put Vault in its own "vault" namespace
+      # CHECK 2: Kubernetes Schema Validation
+      - name: Set up kubeconform
+        run: |
+          curl -Lo kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.6/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
 
-  # This is our GitOps sync policy
-  syncPolicy:
-    automated:
-      prune: true    # Clean up old components
-      selfHeal: true # Fix any manual changes
+      - name: Run kubeconform
+        # Validates YAMLs against official K8s schema
+        # Smart enough to find only Kubernetes manifests
+        run: kubeconform -summary -kubernetes-version 1.30.2 .
 
-    # This tells ArgoCD to create the "vault" namespace for us
-    syncOptions:
-      - CreateNamespace=true
+      # CHECK 3: Security & Misconfiguration Scan
+      - name: Set up Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
+          sh -s -- -b /usr/local/bin
+
+      - name: Run Trivy
+        # Scans manifests for security issues
+        # Fails if HIGH or CRITICAL issues found
+        run: trivy config --exit-code 1 --severity HIGH,CRITICAL .
