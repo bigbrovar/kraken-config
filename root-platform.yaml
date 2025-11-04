@@ -14,6 +14,8 @@ spec:
     repoURL: 'https://github.com/bigbrovar/kraken-config.git'
     targetRevision: HEAD
     path: platform  # This is the directory it will watch
+    directory:
+      recurse: true
 
   # Destination (our local k3s cluster)
   destination:
