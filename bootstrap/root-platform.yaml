@@ -8,24 +8,19 @@ metadata:
     - resources-finalizer.argoproj.io
 spec:
   project: default
-
-  # Source of truth (your new Git repo)
   source:
     repoURL: 'https://github.com/bigbrovar/kraken-config.git'
     targetRevision: HEAD
-    path: platform  # This is the directory it will watch
+    path: platform
     directory:
       recurse: true
-
-  # Destination (our local k3s cluster)
+      jsonnet: {}
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: default
-
-  # Sync policy (This is the GitOps magic)
+    namespace: argocd  # Changed from 'default' to 'argocd'
   syncPolicy:
     automated:
-      prune: true  # Automatically deletes things removed from Git
-      selfHeal: true  # Automatically corrects manual changes
+      prune: true
+      selfHeal: true
     syncOptions:
-      - CreateNamespace=true  # Allows ArgoCD to create namespaces
+      - CreateNamespace=true
