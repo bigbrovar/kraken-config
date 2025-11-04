@@ -1,47 +1,61 @@
 ---
-name: Validate Kubernetes Manifests
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  # Name for the app card in ArgoCD UI
+  name: vault
+  # Tells ArgoCD where this Application lives
+  namespace: argocd
+  # Ensures all components deleted if app deleted
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  # Part of the "default" project in ArgoCD
+  project: default
 
-on:
-  pull_request:
-  push:
-    branches: [main]
-  workflow_dispatch:
+  source:
+    # Official HashiCorp Helm chart repository
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    # The chart name to install
+    chart: vault
+    # Recent stable version
+    targetRevision: 1.27.0
 
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    # Helm values to configure Vault for homelab
+    helm:
+      values: |
+        # Runs Vault in "dev" mode (lightweight, auto-unseals)
+        # Uses in-memory storage. NOT for production.
+        global:
+          enabled: true
+          tlsDisable: true
 
-      # CHECK 1: YAML Syntax
-      - name: Set up yamllint
-        run: pip install yamllint
+        server:
+          enabled: true
+          # Run in dev mode
+          dev:
+            enabled: true
 
-      - name: Run yamllint
-        # Scans the whole repo for YAML syntax errors
-        run: yamllint .
+        # Don't need these for basic setup
+        injector:
+          enabled: false
+        csi:
+          enabled: false
+        ui:
+          # We want the UI
+          enabled: true
 
-      # CHECK 2: Kubernetes Schema Validation
-      - name: Set up kubeconform
-        run: |
-          curl -Lo kubeconform.tar.gz \
-            https://github.com/yannh/kubeconform/releases/download/v0.6.6/kubeconform-linux-amd64.tar.gz
-          tar xf kubeconform.tar.gz
-          sudo mv kubeconform /usr/local/bin/
+  # Where ArgoCD will deploy Vault
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: vault
 
-      - name: Run kubeconform
-        # Validates YAMLs against official K8s schema
-        # Smart enough to find only Kubernetes manifests
-        run: kubeconform -summary -kubernetes-version 1.30.2 .
+  # GitOps sync policy
+  syncPolicy:
+    automated:
+      prune: true  # Clean up old components
+      selfHeal: true  # Fix manual changes
 
-      # CHECK 3: Security & Misconfiguration Scan
-      - name: Set up Trivy
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
-          sh -s -- -b /usr/local/bin
-
-      - name: Run Trivy
-        # Scans manifests for security issues
-        # Fails if HIGH or CRITICAL issues found
-        run: trivy config --exit-code 1 --severity HIGH,CRITICAL .
+    # Create the vault namespace automatically
+    syncOptions:
+      - CreateNamespace=true
