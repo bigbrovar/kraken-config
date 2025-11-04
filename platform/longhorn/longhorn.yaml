@@ -37,6 +37,10 @@ spec:
           storageOverProvisioningPercentage: 200
           storageMinimalAvailablePercentage: 10
 
+        # Disable pre-upgrade checks (causes ArgoCD issues)
+        preUpgradeChecker:
+          jobEnabled: false
+
         # Ingress for Longhorn UI (optional)
         ingress:
           enabled: false
@@ -84,8 +88,9 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - Replace=true
     retry:
-      limit: 3
+      limit: 5
       backoff:
         duration: 5s
         factor: 2
