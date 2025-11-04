@@ -17,12 +17,12 @@ spec:
     chart: cert-manager
     # Use the K8s v1.30 compatible version
     targetRevision: v1.15.1
-    
+
     # Use the modern "values" format
     helm:
       values: |
         installCRDs: true
-        
+
         # Add tolerations for your master/control-plane nodes
         tolerations:
         - key: "node-role.kubernetes.io/control-plane"
@@ -42,7 +42,7 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-    
+
     # Your retry policy is great, let's keep it
     retry:
       limit: 5
