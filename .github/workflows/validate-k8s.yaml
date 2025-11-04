@@ -1,61 +1,51 @@
 ---
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  # Name for the app card in ArgoCD UI
-  name: vault
-  # Tells ArgoCD where this Application lives
-  namespace: argocd
-  # Ensures all components deleted if app deleted
-  finalizers:
-    - resources-finalizer.argoproj.io
-spec:
-  # Part of the "default" project in ArgoCD
-  project: default
-
-  source:
-    # Official HashiCorp Helm chart repository
-    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
-    # The chart name to install
-    chart: vault
-    # Recent stable version
-    targetRevision: 1.27.0
-
-    # Helm values to configure Vault for homelab
-    helm:
-      values: |
-        # Runs Vault in "dev" mode (lightweight, auto-unseals)
-        # Uses in-memory storage. NOT for production.
-        global:
-          enabled: true
-          tlsDisable: true
-
-        server:
-          enabled: true
-          # Run in dev mode
-          dev:
-            enabled: true
-
-        # Don't need these for basic setup
-        injector:
-          enabled: false
-        csi:
-          enabled: false
-        ui:
-          # We want the UI
-          enabled: true
-
-  # Where ArgoCD will deploy Vault
-  destination:
-    server: 'https://kubernetes.default.svc'
-    namespace: vault
-
-  # GitOps sync policy
-  syncPolicy:
-    automated:
-      prune: true  # Clean up old components
-      selfHeal: true  # Fix manual changes
-
-    # Create the vault namespace automatically
-    syncOptions:
-      - CreateNamespace=true
+name: Validate Kubernetes Manifests
+'on':
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      # CHECK 1: YAML Syntax
+      - name: Set up yamllint
+        run: pip install yamllint
+      - name: Run yamllint
+        run: yamllint .
+      # CHECK 2: Kubernetes Schema Validation
+      - name: Set up kubeconform
+        run: |
+          # Break long line by using a variable
+          KUBEFORM_URL="https://github.com/yannh/kubeconform/releases/download"
+          KUBEFORM_URL="${KUBEFORM_URL}/v0.6.6/kubeconform-linux-amd64.tar.gz"
+          curl -Lo kubeconform.tar.gz "$KUBEFORM_URL"
+          tar xf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+      - name: Run kubeconform
+        run: |
+          # Run kubeconform, skipping ArgoCD CRDs
+          # ArgoCD Applications are valid CRDs but not in the standard schema
+          kubeconform -summary -kubernetes-version 1.30.2 \
+            -schema-location default \
+            -skip Application \
+            -ignore-filename-pattern '.github/.*' \
+            .
+      # CHECK 3: Security Scan
+      - name: Set up Trivy
+        run: |
+          # Break long lines by using variables
+          TRIVY_REPO="https://raw.githubusercontent.com"
+          TRIVY_REPO="${TRIVY_REPO}/aquasecurity/trivy/main"
+          TRIVY_INSTALL_SCRIPT="${TRIVY_REPO}/contrib/install.sh"
+          curl -sfL "${TRIVY_INSTALL_SCRIPT}" | sh -s -- -b /usr/local/bin
+      - name: Run Trivy
+        run: |
+          # Break long command onto new lines
+          trivy config \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            .
