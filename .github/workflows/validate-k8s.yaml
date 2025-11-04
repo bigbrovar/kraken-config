@@ -1,61 +1,48 @@
 ---
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  # Name for the app card in ArgoCD UI
-  name: vault
-  # Tells ArgoCD where this Application lives
-  namespace: argocd
-  # Ensures all components deleted if app deleted
-  finalizers:
-    - resources-finalizer.argoproj.io
-spec:
-  # Part of the "default" project in ArgoCD
-  project: default
+name: Validate Kubernetes Manifests
 
-  source:
-    # Official HashiCorp Helm chart repository
-    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
-    # The chart name to install
-    chart: vault
-    # Recent stable version
-    targetRevision: 1.27.0
+'on':
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-    # Helm values to configure Vault for homelab
-    helm:
-      values: |
-        # Runs Vault in "dev" mode (lightweight, auto-unseals)
-        # Uses in-memory storage. NOT for production.
-        global:
-          enabled: true
-          tlsDisable: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-        server:
-          enabled: true
-          # Run in dev mode
-          dev:
-            enabled: true
+      # CHECK 1: YAML Syntax
+      - name: Set up yamllint
+        run: pip install yamllint
 
-        # Don't need these for basic setup
-        injector:
-          enabled: false
-        csi:
-          enabled: false
-        ui:
-          # We want the UI
-          enabled: true
+      - name: Run yamllint
+        run: yamllint .
 
-  # Where ArgoCD will deploy Vault
-  destination:
-    server: 'https://kubernetes.default.svc'
-    namespace: vault
+      # CHECK 2: Kubernetes Schema Validation
+      - name: Set up kubeconform
+        run: |
+          curl -Lo kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.6/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
 
-  # GitOps sync policy
-  syncPolicy:
-    automated:
-      prune: true  # Clean up old components
-      selfHeal: true  # Fix manual changes
+      - name: Run kubeconform
+        run: kubeconform -summary -kubernetes-version 1.30.2 .
 
-    # Create the vault namespace automatically
-    syncOptions:
-      - CreateNamespace=true
+      # CHECK 3: Security Scan
+      - name: Set up Trivy
+        run: |
+          TRIVY_URL="https://raw.githubusercontent.com"
+          TRIVY_URL="${TRIVY_URL}/aquasecurity/trivy/main"
+          TRIVY_URL="${TRIVY_URL}/contrib/install.sh"
+          curl -sfL "${TRIVY_URL}" | sh -s -- -b /usr/local/bin
+
+      - name: Run Trivy
+        run: >
+          trivy config
+          --exit-code 1
+          --severity HIGH,CRITICAL
+          .
