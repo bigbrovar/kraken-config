@@ -4,6 +4,9 @@ kind: Application
 metadata:
   name: cert-manager
   namespace: argocd
+  annotations:
+    # This is a foundational service, so we put it in an early wave
+    argocd.argoproj.io/sync-wave: "1"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -12,11 +15,22 @@ spec:
   source:
     repoURL: https://charts.jetstack.io
     chart: cert-manager
-    targetRevision: v1.13.3
+    # Use the K8s v1.30 compatible version
+    targetRevision: v1.15.1
+    
+    # Use the modern "values" format
     helm:
-      parameters:
-        - name: installCRDs
-          value: "true"
+      values: |
+        installCRDs: true
+        
+        # Add tolerations for your master/control-plane nodes
+        tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
 
   destination:
     server: https://kubernetes.default.svc
@@ -28,6 +42,8 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+    
+    # Your retry policy is great, let's keep it
     retry:
       limit: 5
       backoff:
