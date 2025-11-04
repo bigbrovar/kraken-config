@@ -15,7 +15,7 @@ spec:
 
   source:
     # Official HashiCorp Helm chart repository
-    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    repoURL: 'https://helm.releases.hashicorp.com'
     # The chart name to install
     chart: vault
     # Recent stable version
