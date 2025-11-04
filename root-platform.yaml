@@ -1,10 +1,11 @@
+---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: root-platform
   namespace: argocd
   finalizers:
-    - resources-finalizer.argopj.io
+    - resources-finalizer.argoproj.io
 spec:
   project: default
 
@@ -12,7 +13,7 @@ spec:
   source:
     repoURL: 'https://github.com/bigbrovar/kraken-config.git'
     targetRevision: HEAD
-    path: platform # <-- This is the directory it will watch
+    path: platform  # This is the directory it will watch
 
   # Destination (our local k3s cluster)
   destination:
@@ -22,7 +23,7 @@ spec:
   # Sync policy (This is the GitOps magic)
   syncPolicy:
     automated:
-      prune: true    # Automatically deletes things that are removed from Git
-      selfHeal: true # Automatically corrects any manual changes (drift)
+      prune: true  # Automatically deletes things removed from Git
+      selfHeal: true  # Automatically corrects manual changes
     syncOptions:
-      - CreateNamespace=true # Allows ArgoCD to create namespaces
+      - CreateNamespace=true  # Allows ArgoCD to create namespaces
