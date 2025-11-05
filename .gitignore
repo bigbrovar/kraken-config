@@ -22,3 +22,6 @@ kubeconfig
 .DS_Store
 .vscode/
 .idea/
+bootstrap-secrets.sh
+*.token
+secrets/

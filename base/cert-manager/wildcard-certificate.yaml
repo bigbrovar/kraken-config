@@ -1,0 +1,23 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-homelab-org-ng
+  namespace: cert-manager
+spec:
+  secretName: wildcard-homelab-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  commonName: "*.homelab.org.ng"
+  dnsNames:
+    - "*.homelab.org.ng"
+    - "homelab.org.ng"
+  secretTemplate:
+    annotations:
+      reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: >-
+        vault,argocd,ingress-nginx,longhorn-system
+      reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+      reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: >-
+        vault,argocd,ingress-nginx,longhorn-system

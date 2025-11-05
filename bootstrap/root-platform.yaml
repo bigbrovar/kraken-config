@@ -2,7 +2,55 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: root-platform
+  name: infrastructure
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    path: infrastructure
+    directory:
+      recurse: true
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: base-configs
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    path: base
+    directory:
+      recurse: true
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform
   namespace: argocd
   finalizers:
     - resources-finalizer.argoproj.io
@@ -14,10 +62,9 @@ spec:
     path: platform
     directory:
       recurse: true
-      jsonnet: {}
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: argocd  # Changed from 'default' to 'argocd'
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
