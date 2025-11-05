@@ -5,51 +5,33 @@ metadata:
   name: longhorn
   namespace: argocd
   annotations:
-    # Deploy early - other apps need storage
-    argocd.argoproj.io/sync-wave: "-1"
+    argocd.argoproj.io/sync-wave: "0"
   finalizers:
     - resources-finalizer.argoproj.io
 spec:
   project: default
-
   source:
-    # Official Longhorn Helm chart
     repoURL: 'https://charts.longhorn.io'
     chart: longhorn
     targetRevision: 1.7.2
-
     helm:
       values: |
-        # Core settings
+        preUpgradeChecker:
+          jobEnabled: false
         persistence:
           defaultClass: true
           defaultClassReplicaCount: 2
           reclaimPolicy: Retain
-
-        # Default storage settings
         defaultSettings:
-          backupTarget: ""
           defaultReplicaCount: 2
-          guaranteedInstanceManagerCpu: 5
-          createDefaultDiskLabeledNodes: true
+          createDefaultDiskLabeledNodes: false
           defaultDataPath: /var/lib/longhorn
+          guaranteedInstanceManagerCpu: 5
           replicaSoftAntiAffinity: true
           storageOverProvisioningPercentage: 200
           storageMinimalAvailablePercentage: 10
-
-        # Disable pre-upgrade checks (causes ArgoCD issues)
-        preUpgradeChecker:
-          jobEnabled: false
-
-        # Ingress for Longhorn UI (optional)
         ingress:
           enabled: false
-          # Uncomment when you want UI access
-          # host: longhorn.homelab.org.ng
-          # tls: true
-          # tlsSecret: longhorn-tls
-
-        # Allow on control-plane nodes
         longhornManager:
           tolerations:
           - key: "node-role.kubernetes.io/control-plane"
@@ -58,7 +40,6 @@ spec:
           - key: "node-role.kubernetes.io/master"
             operator: "Exists"
             effect: "NoSchedule"
-
         longhornDriver:
           tolerations:
           - key: "node-role.kubernetes.io/control-plane"
@@ -67,7 +48,6 @@ spec:
           - key: "node-role.kubernetes.io/master"
             operator: "Exists"
             effect: "NoSchedule"
-
         longhornUI:
           tolerations:
           - key: "node-role.kubernetes.io/control-plane"
@@ -76,11 +56,9 @@ spec:
           - key: "node-role.kubernetes.io/master"
             operator: "Exists"
             effect: "NoSchedule"
-
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: longhorn-system
-
   syncPolicy:
     automated:
       prune: true
@@ -88,10 +66,13 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-      - Replace=true
     retry:
       limit: 5
       backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
+        duration: 15s
+        maxDuration: 5m
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /status
