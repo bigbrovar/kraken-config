@@ -1,9 +1,4 @@
 ---
-# Application: longhorn
-# Purpose: Distributed block storage for persistent volumes
-# Sync Wave: 20 (after cert-manager)
-# NOTE: Pre/post upgrade jobs MUST be disabled for ArgoCD compatibility
-# https://longhorn.io/docs/1.7.2/advanced-resources/deploy/install-with-argocd/
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -22,13 +17,10 @@ spec:
     targetRevision: 1.7.2
     helm:
       valuesObject:
-        # Persistence settings
         persistence:
           defaultClass: true
           defaultClassReplicaCount: 2
           reclaimPolicy: Retain
-
-        # Default settings
         defaultSettings:
           defaultDataPath: /var/lib/longhorn
           defaultReplicaCount: 2
@@ -36,32 +28,22 @@ spec:
           createDefaultDiskLabeledNodes: true
           defaultLonghornStaticStorageClass: longhorn
           taintToleration: ""
-
-        # REQUIRED for ArgoCD: Disable upgrade jobs
-        # https://longhorn.io/docs/1.7.2/advanced-resources/deploy/install-with-argocd/
+        # CRITICAL: Required for ArgoCD
         preUpgradeChecker:
           jobEnabled: false
-
         postUpgradeChecker:
           jobEnabled: false
-
-        # Node selectors - only run on labeled NVMe nodes
         longhornManager:
           nodeSelector:
             node.longhorn.io/create-default-disk: "true"
-
         longhornDriver:
           nodeSelector:
             node.longhorn.io/create-default-disk: "true"
-
         longhornUI:
           nodeSelector:
             node.longhorn.io/create-default-disk: "true"
-
-        # Ingress disabled for now (enable after ingress-nginx)
         ingress:
           enabled: false
-
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: longhorn-system
@@ -79,3 +61,8 @@ spec:
         duration: 10s
         factor: 2
         maxDuration: 5m
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jqPathExpressions:
+        - '.spec.conversion.webhook.clientConfig.caBundle'
