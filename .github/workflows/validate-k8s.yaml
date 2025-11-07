@@ -11,14 +11,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       # CHECK 1: YAML Syntax
       - name: Set up yamllint
         run: pip install yamllint
-
       - name: Run yamllint
         run: yamllint .
-
       # CHECK 2: Kubernetes Schema Validation
       - name: Set up kubeconform
         run: |
@@ -28,37 +25,36 @@ jobs:
           curl -Lo kubeconform.tar.gz "$KUBEFORM_URL"
           tar xf kubeconform.tar.gz
           sudo mv kubeconform /usr/local/bin/
-
-      - name: Download CRD Schemas
+      - name: Run kubeconform with CRD schemas
         run: |
-          mkdir -p /tmp/crds
+          # Define schema URLs as variables to keep lines under 120 chars
+          DATREE_SCHEMA="https://raw.githubusercontent.com"
+          DATREE_SCHEMA="${DATREE_SCHEMA}/datreeio/CRDs-catalog/main"
+          DATREE_SCHEMA="${DATREE_SCHEMA}/{{.Group}}"
+          DATREE_SCHEMA="${DATREE_SCHEMA}/{{.ResourceKind}}"
+          DATREE_SCHEMA="${DATREE_SCHEMA}_{{.ResourceAPIVersion}}.json"
 
-          echo "Downloading cert-manager CRDs..."
-          CERTMGR_URL="https://github.com/cert-manager/cert-manager"
-          CERTMGR_URL="${CERTMGR_URL}/releases/download/v1.16.2"
-          curl -sSL "${CERTMGR_URL}/cert-manager.crds.yaml" \
-            -o /tmp/crds/cert-manager.yaml
+          CERTMGR_SCHEMA="https://raw.githubusercontent.com"
+          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}/cert-manager/cert-manager"
+          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}/master/deploy/crds"
+          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}/{{.ResourceKind}}"
+          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}_{{.ResourceAPIVersion}}.json"
 
-          echo "Downloading sealed-secrets CRDs..."
-          SEALED_URL="https://raw.githubusercontent.com"
-          SEALED_URL="${SEALED_URL}/bitnami-labs/sealed-secrets"
-          SEALED_URL="${SEALED_URL}/v0.27.2/helm/sealed-secrets/crds"
-          curl -sSL "${SEALED_URL}/bitnami.com_sealedsecrets.yaml" \
-            -o /tmp/crds/sealed-secrets.yaml
+          SEALED_SCHEMA="https://raw.githubusercontent.com"
+          SEALED_SCHEMA="${SEALED_SCHEMA}/bitnami-labs/sealed-secrets"
+          SEALED_SCHEMA="${SEALED_SCHEMA}/main/helm/sealed-secrets/crds"
+          SEALED_SCHEMA="${SEALED_SCHEMA}/{{.ResourceKind}}"
+          SEALED_SCHEMA="${SEALED_SCHEMA}_{{.ResourceAPIVersion}}.json"
 
-          echo "CRD schemas downloaded"
-          ls -lh /tmp/crds/
-
-      - name: Run kubeconform
-        run: |
-          # Run kubeconform with CRD schemas
-          kubeconform -summary -kubernetes-version 1.30.2 \
+          kubeconform \
+            -strict \
+            -summary \
+            -output json \
             -schema-location default \
-            -schema-location '/tmp/crds/{{.ResourceKind}}.yaml' \
-            -skip Application \
-            -ignore-filename-pattern '.github/.*' \
-            .
-
+            -schema-location "${DATREE_SCHEMA}" \
+            -schema-location "${CERTMGR_SCHEMA}" \
+            -schema-location "${SEALED_SCHEMA}" \
+            configs/
       # CHECK 3: Security Scan
       - name: Set up Trivy
         run: |
@@ -67,7 +63,6 @@ jobs:
           TRIVY_REPO="${TRIVY_REPO}/aquasecurity/trivy/main"
           TRIVY_INSTALL_SCRIPT="${TRIVY_REPO}/contrib/install.sh"
           curl -sfL "${TRIVY_INSTALL_SCRIPT}" | sh -s -- -b /usr/local/bin
-
       - name: Run Trivy
         run: |
           # Break long command onto new lines
