@@ -2,6 +2,8 @@
 # Application: longhorn
 # Purpose: Distributed block storage for persistent volumes
 # Sync Wave: 20 (after cert-manager)
+# NOTE: Pre/post upgrade jobs MUST be disabled for ArgoCD compatibility
+# https://longhorn.io/docs/1.7.2/advanced-resources/deploy/install-with-argocd/
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -9,6 +11,7 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "20"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   finalizers:
     - resources-finalizer.argoproj.io
 spec:
@@ -34,9 +37,12 @@ spec:
           defaultLonghornStaticStorageClass: longhorn
           taintToleration: ""
 
-        # Pre-install checks - bypass NFS module check
-        # NFS is built into kernel, not a module
+        # REQUIRED for ArgoCD: Disable upgrade jobs
+        # https://longhorn.io/docs/1.7.2/advanced-resources/deploy/install-with-argocd/
         preUpgradeChecker:
+          jobEnabled: false
+
+        postUpgradeChecker:
           jobEnabled: false
 
         # Node selectors - only run on labeled NVMe nodes
@@ -66,6 +72,7 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
