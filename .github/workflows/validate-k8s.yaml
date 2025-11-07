@@ -27,21 +27,33 @@ jobs:
           sudo mv kubeconform /usr/local/bin/
       - name: Run kubeconform with CRD schemas
         run: |
+          # Define schema URLs as variables to keep lines under 120 chars
+          DATREE_SCHEMA="https://raw.githubusercontent.com"
+          DATREE_SCHEMA="${DATREE_SCHEMA}/datreeio/CRDs-catalog/main"
+          DATREE_SCHEMA="${DATREE_SCHEMA}/{{.Group}}"
+          DATREE_SCHEMA="${DATREE_SCHEMA}/{{.ResourceKind}}"
+          DATREE_SCHEMA="${DATREE_SCHEMA}_{{.ResourceAPIVersion}}.json"
+
+          CERTMGR_SCHEMA="https://raw.githubusercontent.com"
+          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}/cert-manager/cert-manager"
+          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}/master/deploy/crds"
+          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}/{{.ResourceKind}}"
+          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}_{{.ResourceAPIVersion}}.json"
+
+          SEALED_SCHEMA="https://raw.githubusercontent.com"
+          SEALED_SCHEMA="${SEALED_SCHEMA}/bitnami-labs/sealed-secrets"
+          SEALED_SCHEMA="${SEALED_SCHEMA}/main/helm/sealed-secrets/crds"
+          SEALED_SCHEMA="${SEALED_SCHEMA}/{{.ResourceKind}}"
+          SEALED_SCHEMA="${SEALED_SCHEMA}_{{.ResourceAPIVersion}}.json"
+
           kubeconform \
             -strict \
             -summary \
             -output json \
             -schema-location default \
-            -schema-location >-
-              'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/
-              {{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            -schema-location >-
-              'https://raw.githubusercontent.com/cert-manager/cert-manager/
-              master/deploy/crds/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
-            -schema-location >-
-              'https://raw.githubusercontent.com/bitnami-labs/sealed-secrets/
-              main/helm/sealed-secrets/crds/
-              {{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -schema-location "${DATREE_SCHEMA}" \
+            -schema-location "${CERTMGR_SCHEMA}" \
+            -schema-location "${SEALED_SCHEMA}" \
             configs/
       # CHECK 3: Security Scan
       - name: Set up Trivy
