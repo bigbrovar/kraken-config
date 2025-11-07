@@ -1,0 +1,69 @@
+---
+# Application: longhorn
+# Purpose: Distributed block storage for persistent volumes
+# Sync Wave: 20 (after cert-manager)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: longhorn
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://charts.longhorn.io
+    chart: longhorn
+    targetRevision: 1.7.2
+    helm:
+      valuesObject:
+        # Persistence settings
+        persistence:
+          defaultClass: true
+          defaultClassReplicaCount: 2
+          reclaimPolicy: Retain
+
+        # Default settings
+        defaultSettings:
+          defaultDataPath: /var/lib/longhorn
+          defaultReplicaCount: 2
+          guaranteedInstanceManagerCpu: 5
+          createDefaultDiskLabeledNodes: true
+          defaultLonghornStaticStorageClass: longhorn
+          taintToleration: ""
+
+        # Node selectors - only run on labeled NVMe nodes
+        longhornManager:
+          nodeSelector:
+            node.longhorn.io/create-default-disk: "true"
+
+        longhornDriver:
+          nodeSelector:
+            node.longhorn.io/create-default-disk: "true"
+
+        longhornUI:
+          nodeSelector:
+            node.longhorn.io/create-default-disk: "true"
+
+        # Ingress disabled for now (enable after ingress-nginx)
+        ingress:
+          enabled: false
+
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: longhorn-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
