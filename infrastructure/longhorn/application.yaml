@@ -34,6 +34,11 @@ spec:
           defaultLonghornStaticStorageClass: longhorn
           taintToleration: ""
 
+        # Pre-install checks - bypass NFS module check
+        # NFS is built into kernel, not a module
+        preUpgradeChecker:
+          jobEnabled: false
+
         # Node selectors - only run on labeled NVMe nodes
         longhornManager:
           nodeSelector:
