@@ -1,4 +1,7 @@
 ---
+# Root App-of-Apps: Infrastructure Layer
+# This application scans the infrastructure/ directory and automatically
+# creates child applications for each subdirectory containing application.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -6,6 +9,8 @@ metadata:
   namespace: argocd
   finalizers:
     - resources-finalizer.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
   source:
@@ -14,39 +19,28 @@ spec:
     path: infrastructure
     directory:
       recurse: true
+      # Only process application.yaml files
+      include: '{*/application.yaml,*/*/application.yaml}'
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: argocd
   syncPolicy:
     automated:
-      prune: true
-      selfHeal: true
+      prune: true      # Remove resources when removed from git
+      selfHeal: true   # Auto-sync when cluster state drifts from git
     syncOptions:
-      - CreateNamespace=true
+      - CreateNamespace=false  # Child apps manage their own namespaces
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
 ---
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: base-configs
-  namespace: argocd
-  finalizers:
-    - resources-finalizer.argoproj.io
-spec:
-  project: default
-  source:
-    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
-    targetRevision: HEAD
-    path: base
-    directory:
-      recurse: true
-  destination:
-    server: 'https://kubernetes.default.svc'
-    namespace: cert-manager
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
----
+# Root App-of-Apps: Platform Layer
+# This application scans the platform/ directory and automatically
+# creates child applications for user-facing services
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -54,6 +48,8 @@ metadata:
   namespace: argocd
   finalizers:
     - resources-finalizer.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"  # Deploy after infrastructure
 spec:
   project: default
   source:
@@ -62,6 +58,7 @@ spec:
     path: platform
     directory:
       recurse: true
+      include: '{*/application.yaml,*/*/application.yaml}'
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: argocd
@@ -70,4 +67,10 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+      - CreateNamespace=false
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
