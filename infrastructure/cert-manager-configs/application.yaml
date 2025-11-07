@@ -1,14 +1,14 @@
 ---
 # Application: cert-manager-configs
 # Purpose: Deploys ClusterIssuers and Cloudflare API token secret
-# Sync Wave: 0 (deploys first - before cert-manager installation)
+# Sync Wave: 10 (much later - ensures CRDs are ready)
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: cert-manager-configs
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "10"
   finalizers:
     - resources-finalizer.argoproj.io
 spec:
@@ -25,10 +25,11 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+      - CreateNamespace=false
+      - RespectIgnoreDifferences=true
     retry:
-      limit: 3
+      limit: 5
       backoff:
-        duration: 5s
+        duration: 10s
         factor: 2
-        maxDuration: 2m
+        maxDuration: 5m
