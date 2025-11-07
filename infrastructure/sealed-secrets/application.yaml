@@ -1,7 +1,4 @@
 ---
-# Application: sealed-secrets
-# Purpose: Install Bitnami SealedSecrets controller
-# Sync Wave: -1 (deploys before everything else)
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
