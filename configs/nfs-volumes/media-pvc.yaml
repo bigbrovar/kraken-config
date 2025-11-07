@@ -1,0 +1,17 @@
+---
+# PersistentVolumeClaim for TrueNAS Media
+# Apps in 'media' namespace can use this
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: truenas-media-pvc
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""  # Static binding, no dynamic provisioning
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 10Ti  # Must match PV capacity
+  volumeName: truenas-media-pv  # Explicitly bind to our PV

@@ -1,0 +1,33 @@
+---
+# Application: nfs-volumes
+# Purpose: Mount existing TrueNAS NFS shares as PVs
+# Sync Wave: 21 (after Longhorn)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nfs-volumes
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "21"
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    path: configs/nfs-volumes
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: default  # PV is cluster-scoped, PVC goes to 'media'
+  syncPolicy:
+    automated:
+      prune: false  # Don't auto-delete volumes
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        maxDuration: 3m
