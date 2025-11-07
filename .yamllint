@@ -8,3 +8,6 @@ rules:
 
   comments:
     min-spaces-from-content: 1
+# Ignore specific files
+ignore: |
+  configs/cert-manager/cloudflare-secret-sealed.yaml
