@@ -1,0 +1,10 @@
+---
+extends: default
+
+rules:
+  line-length:
+    max: 120        # Allow 120 chars instead of 80
+    level: warning  # Or make it a warning, not error
+
+  comments:
+    min-spaces-from-content: 1
