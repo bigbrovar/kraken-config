@@ -1,0 +1,28 @@
+---
+# Static PersistentVolume for TrueNAS Media
+# This is cluster-wide and not namespaced
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: truenas-media-pv
+  labels:
+    type: nfs
+    storage: truenas
+spec:
+  capacity:
+    storage: 10Ti
+  accessModes:
+    - ReadWriteMany  # Multiple pods can mount
+  persistentVolumeReclaimPolicy: Retain  # Never delete
+  volumeMode: Filesystem
+  nfs:
+    server: 172.42.0.2
+    path: /mnt/Dune/Media
+  mountOptions:
+    - nfsvers=4.1
+    - hard
+    - tcp
+    - rsize=131072
+    - wsize=131072
+    - timeo=600
+    - retrans=2
