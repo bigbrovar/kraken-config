@@ -11,3 +11,4 @@ rules:
 # Ignore specific files
 ignore: |
   configs/cert-manager/cloudflare-secret-sealed.yaml
+  configs/sealed-secrets/
