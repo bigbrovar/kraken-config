@@ -19,10 +19,16 @@ spec:
         crds:
           enabled: true
           keep: true
+
         global:
           leaderElection:
             namespace: cert-manager
-        # Optional but recommended
+
+        # DISABLE startup API check (causes ArgoCD conflicts)
+        startupapicheck:
+          enabled: false  # ← ADD THIS
+
+        # Resources
         resources:
           requests:
             cpu: 10m
@@ -30,18 +36,18 @@ spec:
           limits:
             cpu: 100m
             memory: 128Mi
-  
+
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: cert-manager
-  
+
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - Replace=true
+      - ServerSideApply=true  # ← Use SSA instead of Replace
       - RespectIgnoreDifferences=true
     retry:
       limit: 5
@@ -49,22 +55,22 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 3m
-  
+
   ignoreDifferences:
-    # CRD webhook caBundle (your original)
+    # CRD webhook caBundle
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
       jqPathExpressions:
         - '.spec.conversion.webhook.clientConfig.caBundle'
-    
-    # ALL validating webhook caBundles (recommended)
+
+    # Validating webhook caBundles
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
       name: cert-manager-webhook
       jqPathExpressions:
         - '.webhooks[].clientConfig.caBundle'
-    
-    # ALL mutating webhook caBundles (recommended)
+
+    # Mutating webhook caBundles
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration
       name: cert-manager-webhook
