@@ -1,86 +1,97 @@
-Here is the updated README.md, rewritten to reflect your cluster's name, "kraken".
+Markdown
 
-Kraken: K3s Homelab GitOps Repository
+# Kraken: K3s Homelab GitOps Repository
 
-This repository is the single source of truth for my k3s homelab cluster, kraken. It follows the GitOps pattern, meaning the state of this repo is automatically synced to the cluster by ArgoCD.
+This repository is the single source of truth for my hybrid-architecture k3s homelab cluster, **kraken**. It strictly follows the GitOps pattern, meaning the entire state of the cluster is defined here and automatically synced by ArgoCD.
 
-The goal of this project is to build a professional-grade, automated platform for learning and experimentation, from the underlying virtual machines to the deployed applications. The entire platform is built on "best-practice" and enterprise-grade tools to mirror a real-world DevOps environment.
+The goal of this project is to build a professional-grade, automated platform for learning and experimentation. It is built on "best-practice" enterprise tools to mirror a real-world DevOps environment.
 
-🚀 Core Technology Stack
+## 🏗️ Hardware Architecture
 
-This platform is built in two layers:
+Kraken runs on a diverse, hybrid mix of hardware, leveraging the strengths of each platform:
 
-1. Infrastructure (Provisioning)
+### Control Plane (HA)
+* **2x Proxmox VMs**: (4GB RAM, 2 vCPU) - Running on separate physical Proxmox servers for true redundancy.
+* **1x HP Desk Mini 800 G2**: (8GB RAM) - Acts as a physical anchor for the control plane.
+* *All 3 nodes run dedicated etcd for a highly available quorum.*
 
-    Hypervisor: Proxmox
+### Data Plane (Workers)
+* **3x HP Desk Mini 800 G2**: (8GB RAM, 500GB dedicated NVMe) - Primary compute nodes. NVMe drives are dedicated to Longhorn for high-performance distributed storage.
+* **4x Raspberry Pi 4**: (4GB RAM, USB Boot SSD) - ARM64 compute nodes for specialized workloads and edge testing.
 
-    VM Templates: Packer
+## 🚀 Core Technology Stack
 
-    VM Deployment: Terraform
+The platform is built in two distinct layers:
 
-    OS Installation: PXE Boot & Pre-seed configuration
+### 1. Infrastructure (Provisioning)
 
-2. Kubernetes Platform (GitOps)
+* **Hypervisor:** Proxmox VE
+* **VM Automation:** Packer (Templates) & Terraform (Deployment)
+* **Physical Automation:** PXE Boot with Preseed configuration (fully automated bare-metal install)
+* **Kubernetes Distribution:** K3s (lightweight, perfect for this hybrid mix)
 
-    Distribution: k3s (running the kraken cluster)
+### 2. Kubernetes Platform (GitOps)
 
-    GitOps Controller: ArgoCD
+* **GitOps Controller:** ArgoCD (App-of-Apps pattern)
+* **Ingress Controller:** ingress-nginx (with MetalLB for LoadBalancing)
+* **Persistent Storage:** Longhorn (Distributed Block Storage on NVMe) & NFS (TrueNAS integration)
+* **SSL/TLS Automation:** cert-manager (Let's Encrypt DNS-01 via Cloudflare)
+* **Secret Management:** Sealed Secrets (Encryption at rest in Git)
+* **Secret Distribution:** Reflector (Auto-copies wildcard certs across namespaces)
 
-    Secret Management: HashiCorp Vault
+## 🗺️ Future Roadmap
 
-    Secrets Bridge: External Secrets Operator (ESO)
+* **[TODO] Migrate Secret Management:** Transition from Sealed Secrets to HashiCorp Vault with External Secrets Operator (ESO) for enterprise-grade secret rotation and dynamic secrets.
 
-    Ingress (Reverse Proxy): ingress-nginx
+## 📁 Repository Structure
 
-    SSL Certificates: cert-manager (with Let's Encrypt)
+This repository uses a multi-tiered ArgoCD "App of Apps" pattern to separate low-level infrastructure from high-level user applications.
 
-    Automatic DNS: ExternalDNS (integrated with Cloudflare)
-
-    Persistent Storage: Longhorn
-
-📁 Repository Structure
-
-This repository uses the ArgoCD "App of Apps" pattern.
-
+```bash
 .
-├── .gitignore
-├── platform/               # 1. Contains all child app manifests (Vault, Longhorn, ArgoCD, etc.)
-├── README.md
-└── root-platform.yaml      # 2. The ONLY file to apply manually. This is the parent "App of Apps".
+├── bootstrap/
+│   └── root-platform.yaml   # The ONLY file applied manually. Kicks off everything.
+├── infrastructure/          # Layer 1: Core cluster services (Storage, Networking, Security)
+│   ├── argocd-ingress/      # Application: Exposes ArgoCD UI via HTTPS
+│   ├── cert-manager/        # Application: Manages SSL certificates
+│   ├── longhorn/            # Application: Distributed block storage
+│   ├── sealed-secrets/      # Application: Decrypts secrets stored in Git
+│   └── ...
+├── platform/                # Layer 2: User-facing applications (Plex, Nextcloud, etc.)
+│   ├── ...
+└── configs/                 # The actual Kubernetes manifests (Payloads)
+    ├── argocd-ingress/      # Ingress route for ArgoCD
+    ├── certificates/        # Wildcard Certificate definitions
+    ├── nfs-volumes/         # PV/PVC definitions for TrueNAS
+    └── ...
 
-    root-platform.yaml: This is the parent application. Its only job is to watch the platform/ directory.
+How It Works
 
-    platform/: This directory contains the ArgoCD Application manifests for every other piece of our platform (Vault, Cert-Manager, our apps, etc.). When a file is added to this directory and pushed to main, ArgoCD will automatically see it and deploy it.
+    bootstrap/root-platform.yaml: This is the master parent application. It watches the infrastructure/ and platform/ directories.
+
+    infrastructure/: Contains ArgoCD Application manifests. These define how and when (sync waves) to deploy core services.
+
+    configs/: Contains the actual raw Kubernetes manifests (Ingresses, Services, PVCs) that the infrastructure apps deploy.
 
 ⚡ How to Bootstrap
 
-To bootstrap a new, empty k3s cluster to this repository's state, only one manual command is required.
+To bootstrap a fresh, empty cluster to this exact state, only one command is required after installing ArgoCD:
+Bash
 
-    Set up SSH Access: (Instructions to be added for giving ArgoCD read access to this private repository).
+kubectl apply -f bootstrap/root-platform.yaml
 
-    Apply the Root App: This command tells ArgoCD to start monitoring this repo and build the kraken cluster.
-    Bash
+ArgoCD will then automatically:
 
-    kubectl apply -f root-platform.yaml
+    Detect all applications in infrastructure/.
 
-From this point on, all other applications will be deployed automatically by ArgoCD.
+    Deploy them in the correct order using Sync Waves (e.g., Storage → Networking → Security → Apps).
+
+    Once infrastructure is healthy, it will start deploying user apps from platform/.
 
 🔒 Secrets Management
 
-This repository MUST NOT contain any plaintext secrets, API keys, or passwords.
+This repository does not contain plaintext secrets.
 
-All secrets for the kraken cluster are managed externally using HashiCorp Vault.
+    Sealed Secrets: All sensitive data (API tokens, passwords) is encrypted into SealedSecret resources that can only be decrypted by the controller running inside the Kraken cluster.
 
-Workflow:
-
-    A secret (e.g., a Cloudflare API token) is stored securely in Vault.
-
-    An application manifest in the platform/ directory will include an ExternalSecret resource.
-
-    The External Secrets Operator (ESO), which is running in the cluster, will see this resource.
-
-    ESO will securely connect to Vault, fetch the secret, and create a native Kubernetes Secret in the correct namespace.
-
-    Our applications (like cert-manager or ExternalDNS) will mount this native Kubernetes Secret and function normally.
-
-ArgoCD only ever syncs the request for a secret (ExternalSecret), not the secret itself.
+    Reflector: Automatically mirrors standard Kubernetes Secrets (like our wildcard TLS certificate) from a central namespace to all other namespaces that need them
