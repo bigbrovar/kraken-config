@@ -1,0 +1,96 @@
+---
+# Application: reflector
+# Purpose: Automatic secret/configmap replication across ALL namespaces
+# Sync Wave: 35 (after ingress-nginx)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: reflector
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://emberstack.github.io/helm-charts
+    chart: reflector
+    targetRevision: 9.1.38  # Latest stable version
+    helm:
+      valuesObject:
+        # Resource limits
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        
+        # RBAC - cluster-wide permissions for copying secrets
+        rbac:
+          enabled: true
+        
+        # Configuration
+        configuration:
+          logging:
+            minimumLevel: Information
+          
+          # Watch ALL namespaces (including new ones)
+          watcher:
+            timeout: 300
+        
+        # Explicit naming
+        nameOverride: reflector
+        fullnameOverride: reflector
+  
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: reflector
+  
+  # Prevent ArgoCD sync issues
+  ignoreDifferences:
+    # RBAC drift prevention
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: reflector
+      jsonPointers:
+        - /rules
+        - /aggregationRule
+    
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+      name: reflector
+      jsonPointers:
+        - /subjects
+        - /roleRef
+    
+    # ServiceAccount auto-generated tokens
+    - group: ""
+      kind: ServiceAccount
+      name: reflector
+      jsonPointers:
+        - /secrets
+        - /imagePullSecrets
+    
+    # Deployment template labels
+    - group: apps
+      kind: Deployment
+      name: reflector
+      jsonPointers:
+        - /spec/template/metadata/labels/pod-template-hash
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        maxDuration: 3m
