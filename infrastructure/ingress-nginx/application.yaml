@@ -24,7 +24,7 @@ spec:
           service:
             type: LoadBalancer
             externalTrafficPolicy: Local
-          
+
           # IMPORTANT: Disable admission webhooks to prevent hanging
           admissionWebhooks:
             enabled: true
@@ -34,13 +34,13 @@ spec:
             # Set timeouts
             timeoutSeconds: 30
             failurePolicy: Ignore  # Don't block on webhook failures
-          
+
           # Metrics enabled but ServiceMonitor disabled (no Prometheus yet)
           metrics:
             enabled: true
             serviceMonitor:
               enabled: false
-          
+
           # Resource limits
           resources:
             requests:
@@ -49,10 +49,10 @@ spec:
             limits:
               cpu: 500m  # Added CPU limit
               memory: 512Mi
-          
+
           # 2 replicas for HA
           replicaCount: 2
-          
+
           # Spread across nodes
           affinity:
             podAntiAffinity:
@@ -66,13 +66,13 @@ spec:
                           values:
                             - ingress-nginx
                     topologyKey: kubernetes.io/hostname
-          
+
           # Set as default ingress class
           ingressClassResource:
             name: nginx
             enabled: true
             default: true
-          
+
           # Security and performance config
           config:
             use-forwarded-headers: "true"
@@ -83,11 +83,11 @@ spec:
               ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:
               ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384
             proxy-body-size: "100m"
-  
+
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: ingress-nginx
-  
+
   # CRITICAL: Ignore webhook and service drift
   ignoreDifferences:
     # Ignore webhook caBundle changes (always drifts)
@@ -109,7 +109,7 @@ spec:
       jsonPointers:
         - /spec/template/metadata/labels
         - /status
-  
+
   syncPolicy:
     automated:
       prune: true
