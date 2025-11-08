@@ -1,0 +1,33 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-ingress
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "31"
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    path: configs/argocd-ingress
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    # Standard GitOps sync options for robustness
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true  # Good for simple manifests like Ingress
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

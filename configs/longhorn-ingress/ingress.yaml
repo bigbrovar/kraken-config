@@ -1,0 +1,28 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: longhorn-ingress
+  namespace: longhorn-system
+  annotations:
+    # Increase body size for large volume backups/restores via UI
+    nginx.ingress.kubernetes.io/proxy-body-size: 10000m
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - longhorn.homelab.org.ng
+      secretName: wildcard-homelab-tls
+  rules:
+    - host: longhorn.homelab.org.ng
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: longhorn-frontend
+                port:
+                  number: 80
