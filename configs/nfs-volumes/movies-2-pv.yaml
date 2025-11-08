@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: truenas-movies-2-pv
+spec:
+  capacity:
+    storage: 5Ti
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    server: 172.42.0.2
+    path: /mnt/Dune/Media/Movies-2
