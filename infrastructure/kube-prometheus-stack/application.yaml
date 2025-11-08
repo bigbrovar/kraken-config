@@ -1,0 +1,360 @@
+---
+# Application: kube-prometheus-stack
+# Version: 79.4.0 (Prometheus Operator v0.86.2)
+# Purpose: Prometheus, Grafana, AlertManager, Exporters
+# Sync Wave: 40
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 79.4.0
+    helm:
+      # SKIP CRDs in Helm (install separately to avoid ArgoCD timeout)
+      skipCrds: true
+      valuesObject:
+        # ============================================
+        # GLOBAL
+        # ============================================
+        namespaceOverride: monitoring
+
+        # ============================================
+        # PROMETHEUS
+        # ============================================
+        prometheus:
+          enabled: true
+
+          prometheusSpec:
+            # Retention
+            retention: 30d
+            retentionSize: 45GB
+
+            # Storage (Longhorn)
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: longhorn
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 50Gi
+
+            # Resources
+            resources:
+              requests:
+                cpu: 500m
+                memory: 2Gi
+              limits:
+                cpu: 2000m
+                memory: 4Gi
+
+            # Scrape everything (not just helm values)
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            probeSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+
+            # Security
+            enableAdminAPI: false
+            enableRemoteWriteReceiver: false
+
+            # Single replica for homelab
+            replicas: 1
+
+            # Pod settings
+            podMetadata:
+              labels:
+                app: prometheus
+
+        # ============================================
+        # GRAFANA
+        # ============================================
+        grafana:
+          enabled: true
+
+          # Admin from SealedSecret
+          admin:
+            existingSecret: grafana-admin-password
+            userKey: admin-user
+            passwordKey: admin-password
+
+          # Timezone
+          defaultDashboardsTimezone: Africa/Lagos
+
+          # Persistence
+          persistence:
+            enabled: true
+            type: pvc
+            storageClassName: longhorn
+            accessModes:
+              - ReadWriteOnce
+            size: 10Gi
+
+          # Ingress with TLS
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - grafana.homelab.org.ng
+            path: /
+            pathType: Prefix
+            tls:
+              - secretName: wildcard-homelab-tls
+                hosts:
+                  - grafana.homelab.org.ng
+
+          # Resources
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          # DISABLE sidecar to prevent ConfigMap drift
+          sidecar:
+            dashboards:
+              enabled: true
+              defaultFolderName: "General"
+              # Prevent drift
+              searchNamespace: monitoring
+            datasources:
+              enabled: true
+              defaultDatasourceEnabled: true
+
+          # Datasources
+          additionalDataSources:
+            - name: Loki
+              type: loki
+              access: proxy
+              url: http://loki-gateway.monitoring.svc.cluster.local
+              isDefault: false
+              jsonData:
+                maxLines: 1000
+                timeout: 60
+
+          # Default dashboards
+          defaultDashboardsEnabled: true
+
+        # ============================================
+        # ALERTMANAGER
+        # ============================================
+        alertmanager:
+          enabled: true
+
+          alertmanagerSpec:
+            # Storage
+            storage:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: longhorn
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 10Gi
+
+            # Resources
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
+
+            # Single replica
+            replicas: 1
+
+          # Ingress
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - alertmanager.homelab.org.ng
+            paths:
+              - /
+            pathType: Prefix
+            tls:
+              - secretName: wildcard-homelab-tls
+                hosts:
+                  - alertmanager.homelab.org.ng
+
+        # ============================================
+        # PROMETHEUS OPERATOR
+        # ============================================
+        prometheusOperator:
+          # Resources
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+          # CRITICAL: Disable webhooks (ArgoCD compatibility)
+          admissionWebhooks:
+            enabled: false
+
+          # Disable TLS
+          tls:
+            enabled: false
+
+        # ============================================
+        # EXPORTERS
+        # ============================================
+        # Node Exporter (hardware metrics)
+        nodeExporter:
+          enabled: true
+
+        # kube-state-metrics (K8s objects)
+        kubeStateMetrics:
+          enabled: true
+
+        # ============================================
+        # MONITORING TARGETS
+        # ============================================
+        # K3s-specific adjustments
+        kubeControllerManager:
+          enabled: false  # K3s embeds this
+
+        kubeEtcd:
+          enabled: false  # K3s uses SQLite by default
+
+        kubeScheduler:
+          enabled: false  # K3s embeds this
+
+        kubeProxy:
+          enabled: false  # K3s doesn't use kube-proxy
+
+        # Keep these
+        kubelet:
+          enabled: true
+
+        kubeApiServer:
+          enabled: true
+
+        coreDns:
+          enabled: true
+
+        # ============================================
+        # ALERTING RULES
+        # ============================================
+        defaultRules:
+          create: true
+          rules:
+            alertmanager: true
+            etcd: false
+            configReloaders: true
+            general: true
+            k8sContainerCpuUsageSecondsTotal: true
+            k8sContainerMemoryCache: true
+            k8sContainerMemoryRss: true
+            k8sContainerMemorySwap: true
+            k8sContainerResource: true
+            k8sContainerMemoryWorkingSetBytes: true
+            k8sPodOwner: true
+            kubeApiserverAvailability: true
+            kubeApiserverBurnrate: true
+            kubeApiserverHistogram: true
+            kubeApiserverSlos: true
+            kubeControllerManager: false
+            kubelet: true
+            kubeProxy: false
+            kubePrometheusGeneral: true
+            kubePrometheusNodeRecording: true
+            kubernetesApps: true
+            kubernetesResources: true
+            kubernetesStorage: true
+            kubernetesSystem: true
+            kubeSchedulerAlerting: false
+            kubeSchedulerRecording: false
+            kubeStateMetrics: true
+            network: true
+            node: true
+            nodeExporterAlerting: true
+            nodeExporterRecording: true
+            prometheus: true
+            prometheusOperator: true
+            windows: false
+
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: monitoring
+
+  # ============================================
+  # ARGOCD WORKAROUNDS
+  # ============================================
+  ignoreDifferences:
+    # Webhook caBundle (changes on every sync)
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks
+
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks
+
+    # Grafana dashboard ConfigMaps (updated by sidecar)
+    - group: ""
+      kind: ConfigMap
+      name: kube-prometheus-stack-grafana
+      jsonPointers:
+        - /data
+
+    - group: ""
+      kind: ConfigMap
+      jsonPointers:
+        - /data/dashboards
+        - /metadata/labels/grafana_dashboard
+
+    # ServiceMonitor metadata drift
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
+      jsonPointers:
+        - /metadata/labels
+        - /spec/endpoints/0/relabelings
+
+    # PrometheusRule metadata drift
+    - group: monitoring.coreos.com
+      kind: PrometheusRule
+      jsonPointers:
+        - /metadata/labels
+        - /spec/groups/0/rules
+
+    # Prometheus statefulset (operator manages)
+    - group: apps
+      kind: StatefulSet
+      name: prometheus-kube-prometheus-stack-prometheus
+      jsonPointers:
+        - /spec/template/metadata/labels
+        - /spec/volumeClaimTemplates
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 10m

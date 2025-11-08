@@ -1,0 +1,200 @@
+---
+# Application: promtail
+# Version: 6.17.1 (Promtail 3.5.1)
+# Purpose: Log collector (DaemonSet on all nodes)
+# Sync Wave: 42
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: promtail
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "42"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: promtail
+    targetRevision: 6.17.1
+    helm:
+      valuesObject:
+        # ============================================
+        # PROMTAIL CONFIG
+        # ============================================
+        config:
+          # Loki endpoint
+          clients:
+            - url: http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push
+              tenant_id: ""
+              external_labels:
+                cluster: kraken
+                environment: homelab
+
+          # Position tracking (use emptyDir to persist across restarts)
+          positions:
+            filename: /run/promtail/positions.yaml
+
+          # Server config
+          server:
+            http_listen_port: 3101
+
+          # Scrape configs
+          scrape_configs:
+            # ==========================================
+            # KUBERNETES PODS
+            # ==========================================
+            - job_name: kubernetes-pods
+              kubernetes_sd_configs:
+                - role: pod
+
+              # Pipeline stages
+              pipeline_stages:
+                - cri: {}
+
+              # Relabeling
+              relabel_configs:
+                # Only scrape running pods
+                - source_labels:
+                    - __meta_kubernetes_pod_phase
+                  action: keep
+                  regex: Running
+
+                # Drop empty containers
+                - source_labels:
+                    - __meta_kubernetes_pod_container_name
+                  action: drop
+                  regex: ^$
+
+                # Node name
+                - source_labels:
+                    - __meta_kubernetes_pod_node_name
+                  target_label: node_name
+
+                # Namespace
+                - source_labels:
+                    - __meta_kubernetes_namespace
+                  target_label: namespace
+
+                # Pod name
+                - source_labels:
+                    - __meta_kubernetes_pod_name
+                  target_label: pod
+
+                # Container name
+                - source_labels:
+                    - __meta_kubernetes_pod_container_name
+                  target_label: container
+
+                # App label
+                - source_labels:
+                    - __meta_kubernetes_pod_label_app
+                  target_label: app
+                  regex: (.+)
+
+                # App.kubernetes.io/name label
+                - source_labels:
+                    - __meta_kubernetes_pod_label_app_kubernetes_io_name
+                  target_label: app
+                  regex: (.+)
+
+                # Job from pod labels
+                - source_labels:
+                    - __meta_kubernetes_pod_label_app_kubernetes_io_component
+                  target_label: component
+                  regex: (.+)
+
+                # Container image
+                - source_labels:
+                    - __meta_kubernetes_pod_container_image
+                  target_label: image
+
+                # Log path
+                - source_labels:
+                    - __meta_kubernetes_pod_uid
+                    - __meta_kubernetes_pod_container_name
+                  target_label: __path__
+                  separator: /
+                  replacement: /var/log/pods/*$1/*.log
+
+        # ============================================
+        # DAEMONSET CONFIG
+        # ============================================
+        daemonset:
+          enabled: true
+
+        # Resources
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+        # ============================================
+        # VOLUMES
+        # ============================================
+        # Mount host log paths
+        extraVolumes:
+          - name: pods
+            hostPath:
+              path: /var/log/pods
+          - name: containers
+            hostPath:
+              path: /var/log/containers
+
+        extraVolumeMounts:
+          - name: pods
+            mountPath: /var/log/pods
+            readOnly: true
+          - name: containers
+            mountPath: /var/log/containers
+            readOnly: true
+
+        # ============================================
+        # RBAC (CRITICAL - needs pod log access)
+        # ============================================
+        rbac:
+          create: true
+          pspEnabled: false
+
+        serviceAccount:
+          create: true
+
+        # ============================================
+        # MONITORING
+        # ============================================
+        serviceMonitor:
+          enabled: true
+          labels:
+            release: kube-prometheus-stack
+
+        # ============================================
+        # PRIORITY
+        # ============================================
+        priorityClassName: ""
+
+        # ============================================
+        # TOLERATIONS (run on all nodes including masters)
+        # ============================================
+        tolerations:
+          - effect: NoSchedule
+            operator: Exists
+
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        maxDuration: 3m

@@ -1,0 +1,220 @@
+---
+# Application: loki-stack
+# Version: 6.46.0 (Loki 3.5.7)
+# Purpose: Log aggregation
+# Sync Wave: 41
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "41"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: 6.46.0
+    helm:
+      valuesObject:
+        # ============================================
+        # DEPLOYMENT MODE
+        # ============================================
+        # Use SingleBinary for homelab simplicity
+        deploymentMode: SingleBinary
+
+        # ============================================
+        # LOKI CONFIG
+        # ============================================
+        loki:
+          # Auth (disabled for internal use)
+          auth_enabled: false
+
+          # Common config
+          commonConfig:
+            replication_factor: 1
+            path_prefix: /var/loki
+
+          # Storage
+          storage:
+            type: filesystem
+            filesystem:
+              chunks_directory: /var/loki/chunks
+              rules_directory: /var/loki/rules
+
+          # Schema (CRITICAL for Loki 3.x)
+          schemaConfig:
+            configs:
+              - from: "2024-01-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: loki_index_
+                  period: 24h
+
+          # Limits
+          limits_config:
+            retention_period: 744h  # 31 days
+            enforce_metric_name: false
+            reject_old_samples: true
+            reject_old_samples_max_age: 168h  # 7 days
+            ingestion_rate_mb: 10
+            ingestion_burst_size_mb: 20
+            max_query_series: 500
+            max_query_parallelism: 32
+
+          # Compactor (for log retention)
+          compactor:
+            working_directory: /var/loki/compactor
+            shared_store: filesystem
+            retention_enabled: true
+            retention_delete_delay: 2h
+            retention_delete_worker_count: 150
+
+        # ============================================
+        # SINGLE BINARY POD
+        # ============================================
+        singleBinary:
+          replicas: 1
+
+          # Persistence (Longhorn)
+          persistence:
+            enabled: true
+            storageClass: longhorn
+            size: 50Gi
+
+          # Resources
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+          # Extra config
+          extraEnv:
+            - name: TZ
+              value: Africa/Lagos
+
+        # ============================================
+        # GATEWAY (nginx for Loki API)
+        # ============================================
+        gateway:
+          enabled: true
+          replicas: 1
+
+          # Ingress
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - host: loki.homelab.org.ng
+                paths:
+                  - path: /
+                    pathType: Prefix
+            tls:
+              - secretName: wildcard-homelab-tls
+                hosts:
+                  - loki.homelab.org.ng
+
+          # Resources
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+          # Nginx config (CRITICAL for Loki 3.x)
+          nginxConfig:
+            httpSnippet: |
+              client_max_body_size 10M;
+            serverSnippet: |
+              client_max_body_size 10M;
+
+        # ============================================
+        # MONITORING
+        # ============================================
+        monitoring:
+          # Self-monitoring disabled
+          selfMonitoring:
+            enabled: false
+            grafanaAgent:
+              installOperator: false
+
+          # ServiceMonitor for Prometheus
+          serviceMonitor:
+            enabled: true
+            labels:
+              release: kube-prometheus-stack
+
+          # Loki Canary (tests log ingestion)
+          lokiCanary:
+            enabled: false
+
+        # ============================================
+        # DISABLE UNUSED COMPONENTS
+        # ============================================
+        # Not needed in SingleBinary mode
+        backend:
+          replicas: 0
+
+        read:
+          replicas: 0
+
+        write:
+          replicas: 0
+
+        ingester:
+          replicas: 0
+
+        querier:
+          replicas: 0
+
+        queryFrontend:
+          replicas: 0
+
+        queryScheduler:
+          replicas: 0
+
+        distributor:
+          replicas: 0
+
+        compactor:
+          replicas: 0
+
+        indexGateway:
+          replicas: 0
+
+        bloomCompactor:
+          replicas: 0
+
+        bloomGateway:
+          replicas: 0
+
+        # Test pod
+        test:
+          enabled: false
+
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        maxDuration: 5m
