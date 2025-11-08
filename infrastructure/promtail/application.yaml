@@ -32,7 +32,7 @@ spec:
                 cluster: kraken
                 environment: homelab
 
-          # Position tracking (use emptyDir to persist across restarts)
+          # Position tracking
           positions:
             filename: /run/promtail/positions.yaml
 
@@ -110,7 +110,7 @@ spec:
                     - __meta_kubernetes_pod_container_image
                   target_label: image
 
-                # Log path
+                # Log path (chart handles this automatically)
                 - source_labels:
                     - __meta_kubernetes_pod_uid
                     - __meta_kubernetes_pod_container_name
@@ -134,24 +134,12 @@ spec:
             memory: 256Mi
 
         # ============================================
-        # VOLUMES
+        # VOLUMES - REMOVED (chart handles these automatically)
         # ============================================
-        # Mount host log paths
-        extraVolumes:
-          - name: pods
-            hostPath:
-              path: /var/log/pods
-          - name: containers
-            hostPath:
-              path: /var/log/containers
-
-        extraVolumeMounts:
-          - name: pods
-            mountPath: /var/log/pods
-            readOnly: true
-          - name: containers
-            mountPath: /var/log/containers
-            readOnly: true
+        # The promtail chart already mounts:
+        # - /var/log/pods
+        # - /var/log/containers
+        # - /run/promtail (for positions)
 
         # ============================================
         # RBAC (CRITICAL - needs pod log access)
