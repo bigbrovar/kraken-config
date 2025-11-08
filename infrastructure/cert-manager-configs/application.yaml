@@ -1,7 +1,7 @@
 ---
 # Application: cert-manager-configs
-# Purpose: Deploys ClusterIssuers and Cloudflare API token secret
-# Sync Wave: 10 (much later - ensures CRDs are ready)
+# Purpose: Deploy ClusterIssuers ONLY (secrets managed separately)
+# Sync Wave: 10 (after sealed-secrets-configs)
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -10,7 +10,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "10"
   finalizers:
-    - resources-finalizer.argoproj.io
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:

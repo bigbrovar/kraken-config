@@ -1,0 +1,35 @@
+---
+# Application: sealed-secrets-configs
+# Purpose: Deploy ALL SealedSecrets to their target namespaces
+# Sync Wave: 5 (after sealed-secrets controller, before apps need secrets)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sealed-secrets-configs
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    path: configs/sealed-secrets
+  destination:
+    server: 'https://kubernetes.default.svc'
+    # NOTE: Each SealedSecret defines its own target namespace
+    namespace: default  # Ignored, each secret has metadata.namespace
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        maxDuration: 3m
