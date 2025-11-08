@@ -13,7 +13,7 @@ metadata:
 spec:
   secretName: wildcard-homelab-tls
   issuerRef:
-    name: letsencrypt-dns-prod
+    name: letsencrypt-production  # ← CHANGED FROM letsencrypt-dns-prod
     kind: ClusterIssuer
     group: cert-manager.io
   dnsNames:
