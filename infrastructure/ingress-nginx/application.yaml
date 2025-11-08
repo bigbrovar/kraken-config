@@ -1,0 +1,127 @@
+---
+# Application: ingress-nginx
+# Purpose: HTTP/HTTPS ingress controller with MetalLB LoadBalancer
+# Sync Wave: 30 (after storage)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io  # Fixed typo
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes.github.io/ingress-nginx
+    chart: ingress-nginx
+    targetRevision: 4.11.3
+    helm:
+      valuesObject:
+        controller:
+          # Use LoadBalancer (MetalLB will assign from 172.42.1.10-250)
+          service:
+            type: LoadBalancer
+            externalTrafficPolicy: Local
+
+          # IMPORTANT: Disable admission webhooks to prevent hanging
+          admissionWebhooks:
+            enabled: true
+            # Patch job can cause issues, disable it
+            patch:
+              enabled: false
+            # Set timeouts
+            timeoutSeconds: 30
+            failurePolicy: Ignore  # Don't block on webhook failures
+
+          # Metrics enabled but ServiceMonitor disabled (no Prometheus yet)
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: false
+
+          # Resource limits
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m  # Added CPU limit
+              memory: 512Mi
+
+          # 2 replicas for HA
+          replicaCount: 2
+
+          # Spread across nodes
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: app.kubernetes.io/name
+                          operator: In
+                          values:
+                            - ingress-nginx
+                    topologyKey: kubernetes.io/hostname
+
+          # Set as default ingress class
+          ingressClassResource:
+            name: nginx
+            enabled: true
+            default: true
+
+          # Security and performance config
+          config:
+            use-forwarded-headers: "true"
+            compute-full-forwarded-for: "true"
+            use-proxy-protocol: "false"
+            ssl-protocols: "TLSv1.2 TLSv1.3"
+            ssl-ciphers: >-
+              ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:
+              ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384
+            proxy-body-size: "100m"
+
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: ingress-nginx
+
+  # CRITICAL: Ignore webhook and service drift
+  ignoreDifferences:
+    # Ignore webhook caBundle changes (always drifts)
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: ingress-nginx-admission
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/0/failurePolicy
+    # Ignore LoadBalancer service status (prevents "Progressing" stuck state)
+    - group: ""
+      kind: Service
+      name: ingress-nginx-controller
+      jsonPointers:
+        - /status/loadBalancer
+    # Ignore admission job labels (they change on each run)
+    - group: batch
+      kind: Job
+      jsonPointers:
+        - /spec/template/metadata/labels
+        - /status
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true  # May cause webhook spam on newer ArgoCD versions
+      - RespectIgnoreDifferences=true
+      # Skip admission webhook jobs during sync
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
