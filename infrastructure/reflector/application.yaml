@@ -27,28 +27,28 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-        
+
         # RBAC - cluster-wide permissions for copying secrets
         rbac:
           enabled: true
-        
+
         # Configuration
         configuration:
           logging:
             minimumLevel: Information
-          
+
           # Watch ALL namespaces (including new ones)
           watcher:
             timeout: 300
-        
+
         # Explicit naming
         nameOverride: reflector
         fullnameOverride: reflector
-  
+
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: reflector
-  
+
   # Prevent ArgoCD sync issues
   ignoreDifferences:
     # RBAC drift prevention
@@ -58,14 +58,14 @@ spec:
       jsonPointers:
         - /rules
         - /aggregationRule
-    
+
     - group: rbac.authorization.k8s.io
       kind: ClusterRoleBinding
       name: reflector
       jsonPointers:
         - /subjects
         - /roleRef
-    
+
     # ServiceAccount auto-generated tokens
     - group: ""
       kind: ServiceAccount
@@ -73,14 +73,14 @@ spec:
       jsonPointers:
         - /secrets
         - /imagePullSecrets
-    
+
     # Deployment template labels
     - group: apps
       kind: Deployment
       name: reflector
       jsonPointers:
         - /spec/template/metadata/labels/pod-template-hash
-  
+
   syncPolicy:
     automated:
       prune: true
