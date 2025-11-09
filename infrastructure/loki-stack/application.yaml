@@ -31,7 +31,7 @@ spec:
         loki:
           auth_enabled: false
 
-          # --- FIX 2: PERMISSIONS FOR LONGHORN ---
+          # --- PERMISSIONS FOR LONGHORN ---
           podSecurityContext:
             fsGroup: 10001
           containerSecurityContext:
@@ -42,7 +42,6 @@ spec:
             capabilities:
               drop:
                 - ALL
-          # ---------------------------------------
 
           commonConfig:
             replication_factor: 1
@@ -66,7 +65,6 @@ spec:
 
           limits_config:
             retention_period: 744h
-            # REMOVED: enforce_metric_name (caused config error)
             reject_old_samples: true
             reject_old_samples_max_age: 168h
             ingestion_rate_mb: 10
@@ -79,9 +77,8 @@ spec:
             retention_enabled: true
             retention_delete_delay: 2h
             retention_delete_worker_count: 150
-            # FIX: Explicitly configure delete request store for retention
-            delete_request_store:
-              store: filesystem
+            # FIX: Must be a string, NOT a map
+            delete_request_store: filesystem
 
         # ============================================
         # SINGLE BINARY POD
