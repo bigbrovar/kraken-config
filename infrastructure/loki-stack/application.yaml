@@ -76,10 +76,12 @@ spec:
 
           compactor:
             working_directory: /var/loki/compactor
-            # REMOVED: shared_store (inherits from common)
             retention_enabled: true
             retention_delete_delay: 2h
             retention_delete_worker_count: 150
+            # FIX: Explicitly configure delete request store for retention
+            delete_request_store:
+              store: filesystem
 
         # ============================================
         # SINGLE BINARY POD
