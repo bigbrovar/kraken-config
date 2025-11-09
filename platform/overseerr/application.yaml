@@ -1,0 +1,96 @@
+---
+# Overseerr - Media Request Management
+# Sync Wave: 52 (after *arr apps)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: overseerr
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "52"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://bjw-s.github.io/helm-charts/
+    chart: app-template
+    targetRevision: 3.5.1
+    helm:
+      valuesObject:
+        controllers:
+          overseerr:
+            containers:
+              app:
+                image:
+                  repository: lscr.io/linuxserver/overseerr
+                  tag: 1.33.2
+                env:
+                  TZ: Africa/Lagos
+                  PUID: "1000"
+                  PGID: "1000"
+                probes:
+                  liveness:
+                    enabled: true
+                  readiness:
+                    enabled: true
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+
+        service:
+          app:
+            controller: overseerr
+            ports:
+              http:
+                port: 5055
+
+        ingress:
+          app:
+            enabled: true
+            className: nginx
+            annotations:
+              cert-manager.io/cluster-issuer: letsencrypt-production
+            hosts:
+              - host: overseerr.homelab.org.ng
+                paths:
+                  - path: /
+                    pathType: Prefix
+                    service:
+                      identifier: app
+                      port: http
+            tls:
+              - secretName: wildcard-homelab-tls
+                hosts:
+                  - overseerr.homelab.org.ng
+
+        persistence:
+          config:
+            enabled: true
+            type: persistentVolumeClaim
+            storageClass: longhorn
+            accessMode: ReadWriteOnce
+            size: 5Gi
+            globalMounts:
+              - path: /config
+
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: media
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        maxDuration: 3m
