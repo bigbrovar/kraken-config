@@ -24,13 +24,13 @@ spec:
         # DEPLOYMENT MODE
         # ============================================
         deploymentMode: SingleBinary
-        
+
         # ============================================
         # LOKI CONFIG
         # ============================================
         loki:
           auth_enabled: false
-          
+
           # --- FIX 2: PERMISSIONS FOR LONGHORN ---
           podSecurityContext:
             fsGroup: 10001
@@ -43,17 +43,17 @@ spec:
               drop:
                 - ALL
           # ---------------------------------------
-          
+
           commonConfig:
             replication_factor: 1
             path_prefix: /var/loki
-          
+
           storage:
             type: filesystem
             filesystem:
               chunks_directory: /var/loki/chunks
               rules_directory: /var/loki/rules
-          
+
           schemaConfig:
             configs:
               - from: "2024-01-01"
@@ -63,7 +63,7 @@ spec:
                 index:
                   prefix: loki_index_
                   period: 24h
-          
+
           limits_config:
             retention_period: 744h
             # REMOVED: enforce_metric_name (caused config error)
@@ -73,14 +73,14 @@ spec:
             ingestion_burst_size_mb: 20
             max_query_series: 500
             max_query_parallelism: 32
-          
+
           compactor:
             working_directory: /var/loki/compactor
             # REMOVED: shared_store (inherits from common)
             retention_enabled: true
             retention_delete_delay: 2h
             retention_delete_worker_count: 150
-        
+
         # ============================================
         # SINGLE BINARY POD
         # ============================================
@@ -100,7 +100,7 @@ spec:
           extraEnv:
             - name: TZ
               value: Africa/Lagos
-        
+
         # ============================================
         # GATEWAY (nginx)
         # ============================================
@@ -129,7 +129,7 @@ spec:
           nginxConfig:
             serverSnippet: |
               client_max_body_size 10M;
-        
+
         # ============================================
         # MONITORING
         # ============================================
@@ -144,7 +144,7 @@ spec:
               release: kube-prometheus-stack
           lokiCanary:
             enabled: false
-        
+
         # ============================================
         # DISABLE UNUSED COMPONENTS
         # ============================================
@@ -174,11 +174,11 @@ spec:
           replicas: 0
         test:
           enabled: false
-  
+
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: monitoring
-  
+
   syncPolicy:
     automated:
       prune: true
