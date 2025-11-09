@@ -23,29 +23,37 @@ spec:
         # ============================================
         # DEPLOYMENT MODE
         # ============================================
-        # Use SingleBinary for homelab simplicity
         deploymentMode: SingleBinary
-
+        
         # ============================================
         # LOKI CONFIG
         # ============================================
         loki:
-          # Auth (disabled for internal use)
           auth_enabled: false
-
-          # Common config
+          
+          # --- FIX 2: PERMISSIONS FOR LONGHORN ---
+          podSecurityContext:
+            fsGroup: 10001
+          containerSecurityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          # ---------------------------------------
+          
           commonConfig:
             replication_factor: 1
             path_prefix: /var/loki
-
-          # Storage
+          
           storage:
             type: filesystem
             filesystem:
               chunks_directory: /var/loki/chunks
               rules_directory: /var/loki/rules
-
-          # Schema (CRITICAL for Loki 3.x)
+          
           schemaConfig:
             configs:
               - from: "2024-01-01"
@@ -55,39 +63,33 @@ spec:
                 index:
                   prefix: loki_index_
                   period: 24h
-
-          # Limits
+          
           limits_config:
-            retention_period: 744h  # 31 days
-            enforce_metric_name: false
+            retention_period: 744h
+            # REMOVED: enforce_metric_name (caused config error)
             reject_old_samples: true
-            reject_old_samples_max_age: 168h  # 7 days
+            reject_old_samples_max_age: 168h
             ingestion_rate_mb: 10
             ingestion_burst_size_mb: 20
             max_query_series: 500
             max_query_parallelism: 32
-
-          # Compactor (for log retention)
+          
           compactor:
             working_directory: /var/loki/compactor
-            shared_store: filesystem
+            # REMOVED: shared_store (inherits from common)
             retention_enabled: true
             retention_delete_delay: 2h
             retention_delete_worker_count: 150
-
+        
         # ============================================
         # SINGLE BINARY POD
         # ============================================
         singleBinary:
           replicas: 1
-
-          # Persistence (Longhorn)
           persistence:
             enabled: true
             storageClass: longhorn
             size: 50Gi
-
-          # Resources
           resources:
             requests:
               cpu: 200m
@@ -95,20 +97,16 @@ spec:
             limits:
               cpu: 1000m
               memory: 1Gi
-
-          # Extra config
           extraEnv:
             - name: TZ
               value: Africa/Lagos
-
+        
         # ============================================
-        # GATEWAY (nginx for Loki API)
+        # GATEWAY (nginx)
         # ============================================
         gateway:
           enabled: true
           replicas: 1
-
-          # Ingress
           ingress:
             enabled: true
             ingressClassName: nginx
@@ -121,8 +119,6 @@ spec:
               - secretName: wildcard-homelab-tls
                 hosts:
                   - loki.homelab.org.ng
-
-          # Resources
           resources:
             requests:
               cpu: 50m
@@ -130,81 +126,59 @@ spec:
             limits:
               cpu: 200m
               memory: 128Mi
-
-          # Nginx config (CRITICAL for Loki 3.x)
-          # REMOVED httpSnippet to fix duplicate directive error
           nginxConfig:
             serverSnippet: |
               client_max_body_size 10M;
-
+        
         # ============================================
         # MONITORING
         # ============================================
         monitoring:
-          # Self-monitoring disabled
           selfMonitoring:
             enabled: false
             grafanaAgent:
               installOperator: false
-
-          # ServiceMonitor for Prometheus
           serviceMonitor:
             enabled: true
             labels:
               release: kube-prometheus-stack
-
-          # Loki Canary (tests log ingestion)
           lokiCanary:
             enabled: false
-
+        
         # ============================================
         # DISABLE UNUSED COMPONENTS
         # ============================================
-        # Not needed in SingleBinary mode
         backend:
           replicas: 0
-
         read:
           replicas: 0
-
         write:
           replicas: 0
-
         ingester:
           replicas: 0
-
         querier:
           replicas: 0
-
         queryFrontend:
           replicas: 0
-
         queryScheduler:
           replicas: 0
-
         distributor:
           replicas: 0
-
         compactor:
           replicas: 0
-
         indexGateway:
           replicas: 0
-
         bloomCompactor:
           replicas: 0
-
         bloomGateway:
           replicas: 0
-
-        # Test pod
         test:
           enabled: false
-
+  
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: monitoring
-
+  
   syncPolicy:
     automated:
       prune: true
