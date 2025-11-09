@@ -8,7 +8,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "20"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   finalizers:
-    - resources-finalizer.argoproj.io
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
@@ -25,23 +25,16 @@ spec:
           defaultDataPath: /var/lib/longhorn
           defaultReplicaCount: 2
           guaranteedInstanceManagerCpu: 5
+          # DATA RESTRICTION: Data only goes to nodes with this label
           createDefaultDiskLabeledNodes: true
           defaultLonghornStaticStorageClass: longhorn
           taintToleration: ""
-        # CRITICAL: Required for ArgoCD
+        # Required for ArgoCD
         preUpgradeChecker:
           jobEnabled: false
         postUpgradeChecker:
           jobEnabled: false
-        longhornManager:
-          nodeSelector:
-            node.longhorn.io/create-default-disk: "true"
-        longhornDriver:
-          nodeSelector:
-            node.longhorn.io/create-default-disk: "true"
-        longhornUI:
-          nodeSelector:
-            node.longhorn.io/create-default-disk: "true"
+        # DRIVER RESTRICTION REMOVED: Now they run on Pis too!
         ingress:
           enabled: false
   destination:
