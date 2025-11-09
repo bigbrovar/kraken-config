@@ -1,23 +1,21 @@
 ---
-# Static PersistentVolume for TrueNAS Media
-# This is cluster-wide and not namespaced
+# 1. The Physical Volume (The Warehouse)
 apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: truenas-media-pv
   labels:
-    type: nfs
     storage: truenas
+    type: nfs
+    purpose: media-root
 spec:
   capacity:
-    storage: 10Ti
+    storage: 20Ti
   accessModes:
-    - ReadWriteMany  # Multiple pods can mount
-  persistentVolumeReclaimPolicy: Retain  # Never delete
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""  # <--- IMPORTANT: Keeps it strictly manual
   volumeMode: Filesystem
-  nfs:
-    server: 172.42.0.2
-    path: /mnt/Dune/Media
   mountOptions:
     - nfsvers=4.1
     - hard
@@ -26,3 +24,22 @@ spec:
     - wsize=131072
     - timeo=600
     - retrans=2
+  nfs:
+    server: 172.42.0.2
+    path: /mnt/Dune/Media  # <--- Trailing slash removed
+
+---
+# 2. The Claim Ticket (The Key for your apps)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: media-root-pvc
+  namespace: media  # IMPORTANT: This must be in the 'media' namespace
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: truenas-media-pv  # <--- Binds DIRECTLY to the specific PV above
+  resources:
+    requests:
+      storage: 20Ti
