@@ -81,6 +81,14 @@ spec:
             delete_request_store: filesystem
 
         # ============================================
+        # DISABLE EXTERNAL CACHES (Save 10GB+ RAM)
+        # ============================================
+        chunksCache:
+          enabled: false
+        resultsCache:
+          enabled: false
+
+        # ============================================
         # SINGLE BINARY POD
         # ============================================
         singleBinary:
