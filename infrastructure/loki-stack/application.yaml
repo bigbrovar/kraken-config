@@ -132,9 +132,8 @@ spec:
               memory: 128Mi
 
           # Nginx config (CRITICAL for Loki 3.x)
+          # REMOVED httpSnippet to fix duplicate directive error
           nginxConfig:
-            httpSnippet: |
-              client_max_body_size 10M;
             serverSnippet: |
               client_max_body_size 10M;
 
