@@ -33,12 +33,12 @@ spec:
     spec:
       # POD-LEVEL SECURITY (Copy to others)
       securityContext:
-        runAsUser: 1000        # <--- ADD: Force non-root user
-        runAsGroup: 1000       # <--- ADD: Force non-root group
-        fsGroup: 1000
-        runAsNonRoot: true     # <--- ADD: Prevent root execution
-        seccompProfile:        # <--- ADD: Kernel syscall protection
-          type: RuntimeDefault
+      #  runAsUser: 1000        # <--- ADD: Force non-root user
+      #  runAsGroup: 1000       # <--- ADD: Force non-root group
+      #  fsGroup: 1000
+      #  runAsNonRoot: true     # <--- ADD: Prevent root execution
+      #  seccompProfile:        # <--- ADD: Kernel syscall protection
+      #    type: RuntimeDefault
       containers:
         - name: lidarr
           image: lscr.io/linuxserver/lidarr:2.8.2
@@ -48,6 +48,10 @@ spec:
             capabilities:
               drop:
                 - ALL
+              add:
+                - CHOWN
+                - SETGID
+                - SETUID
           env:
             - name: PUID
               value: "1000"
