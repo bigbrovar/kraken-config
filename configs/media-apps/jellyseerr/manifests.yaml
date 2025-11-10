@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: overseerr-config
+  name: jellyseerr-config
   namespace: media
 spec:
   accessModes:
@@ -15,25 +15,26 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: overseerr
+  name: jellyseerr
   namespace: media
   labels:
-    app: overseerr
+    app: jellyseerr
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: overseerr
+      app: jellyseerr
   template:
     metadata:
       labels:
-        app: overseerr
+        app: jellyseerr
     spec:
       containers:
-        - name: overseerr
-          image: lscr.io/linuxserver/overseerr:1.33.2
+        - name: jellyseerr
+          # CHANGED IMAGE TO JELLYSEERR
+          image: lscr.io/linuxserver/jellyseerr:latest
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
@@ -57,7 +58,6 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
-            # Overseerr does NOT need /media mounted
             - name: tmp
               mountPath: /tmp
             - name: run
@@ -88,7 +88,7 @@ spec:
       volumes:
         - name: config
           persistentVolumeClaim:
-            claimName: overseerr-config
+            claimName: jellyseerr-config
         - name: tmp
           emptyDir: {}
         - name: run
@@ -97,12 +97,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: overseerr
+  name: jellyseerr
   namespace: media
 spec:
   type: ClusterIP
   selector:
-    app: overseerr
+    app: jellyseerr
   ports:
     - name: http
       port: 5055
@@ -111,7 +111,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: overseerr
+  name: jellyseerr
   namespace: media
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
@@ -122,16 +122,18 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - overseerr.homelab.org.ng
+        # CHANGED HOSTNAME
+        - jellyseerr.homelab.org.ng
       secretName: wildcard-homelab-tls
   rules:
-    - host: overseerr.homelab.org.ng
+    # CHANGED HOSTNAME
+    - host: jellyseerr.homelab.org.ng
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: overseerr
+                name: jellyseerr
                 port:
                   name: http
