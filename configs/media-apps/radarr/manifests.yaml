@@ -17,6 +17,8 @@ kind: Deployment
 metadata:
   name: radarr
   namespace: media
+  labels:
+    app: radarr
 spec:
   replicas: 1
   strategy:
@@ -29,15 +31,16 @@ spec:
       labels:
         app: radarr
     spec:
+      # REMOVED Pod-level securityContext to match Lidarr
       containers:
         - name: radarr
           image: lscr.io/linuxserver/radarr:5.15.1
           securityContext:
-            readOnlyRootFilesystem: true  # <--- ADD: The big one. Makes root strictly read-only.
-            allowPrivilegeEscalation: false # <--- ADD: Prevent sudo-like behavior
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
             capabilities:
               drop:
-                - ALL                     # <--- ADD: Drop unneeded Linux capabilities
+                - ALL
               add:
                 - CHOWN
                 - SETGID
@@ -57,11 +60,10 @@ spec:
               mountPath: /config
             - name: media
               mountPath: /media
-            # 📂 REQUIRED FOR READ-ONLY ROOT (Copy to others)
-            - name: tmp                   # <--- ADD
-              mountPath: /tmp             # <--- ADD
-            - name: run                   # <--- ADD
-              mountPath: /run             # <--- ADD
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /run
           resources:
             requests:
               cpu: 200m
@@ -92,10 +94,9 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: media-root-pvc
-        # 📂 TEMPORARY VOLUMES (Copy to others)
-        - name: tmp        # <--- ADD: Matches volumeMount above
+        - name: tmp
           emptyDir: {}
-        - name: run        # <--- ADD: Matches volumeMount above
+        - name: run
           emptyDir: {}
 ---
 apiVersion: v1
