@@ -7,7 +7,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+    - resources-finalizer.argoproj.io
 spec:
   project: default
   source:
@@ -24,9 +24,14 @@ spec:
           leaderElection:
             namespace: cert-manager
 
+        # 👇 KILL THE SHIM 👇
+        ingressShim:
+          enabled: false
+        # 👆 END KILL SHIM 👆
+
         # DISABLE startup API check (causes ArgoCD conflicts)
         startupapicheck:
-          enabled: false  # ← ADD THIS
+          enabled: false
 
         # Resources
         resources:
@@ -47,7 +52,7 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true  # ← Use SSA instead of Replace
+      - ServerSideApply=true
       - RespectIgnoreDifferences=true
     retry:
       limit: 5
