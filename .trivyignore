@@ -1,3 +1,5 @@
 # AV-KSV-0118: LSIO images must start as root to fix permissions via s6-overlay.
-# We have accepted this risk as they drop privileges immediately after startup.
 AVD-KSV-0118
+
+# AVD-KSV-0014: Flaresolverr runs a full browser and needs a writable filesystem.
+AVD-KSV-0014
