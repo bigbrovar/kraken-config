@@ -33,9 +33,21 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
+        runAsUser: 1000        # <--- ADD: Force non-root user
+        runAsGroup: 1000
+        runAsNonRoot: true     # <--- ADD: Prevent root execution
+        seccompProfile:        # <--- ADD: Kernel syscall protection
+          type: RuntimeDefault
       containers:
         - name: sonarr
           image: lscr.io/linuxserver/sonarr:4.0.11
+          # container security
+          securityContext:
+            readOnlyRootFilesystem: true  # <--- ADD: The big one. Makes root strictly read-only.
+            allowPrivilegeEscalation: false # <--- ADD: Prevent sudo-like behavior
+            capabilities:
+              drop:
+                - ALL                     # <--- ADD: Drop unneeded Linux capabilities
           env:
             - name: PUID
               value: "1000"
@@ -51,6 +63,10 @@ spec:
               mountPath: /config
             - name: media
               mountPath: /media
+            - name: tmp                   # <--- ADD
+              mountPath: /tmp             # <--- ADD
+            - name: run                   # <--- ADD
+              mountPath: /run             # <--- ADD
           resources:
             requests:
               cpu: 200m
@@ -81,6 +97,11 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: media-root-pvc
+        #  TEMPORARY VOLUMES (Copy to others)
+        - name: tmp        # <--- ADD: Matches volumeMount above
+          emptyDir: {}
+        - name: run        # <--- ADD: Matches volumeMount above
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
