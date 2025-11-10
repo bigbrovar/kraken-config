@@ -31,11 +31,23 @@ spec:
       labels:
         app: lidarr
     spec:
+      # POD-LEVEL SECURITY (Copy to others)
       securityContext:
+        runAsUser: 1000        # <--- ADD: Force non-root user
+        runAsGroup: 1000       # <--- ADD: Force non-root group
         fsGroup: 1000
+        runAsNonRoot: true     # <--- ADD: Prevent root execution
+        seccompProfile:        # <--- ADD: Kernel syscall protection
+          type: RuntimeDefault
       containers:
         - name: lidarr
           image: lscr.io/linuxserver/lidarr:2.8.2
+          securityContext:
+            readOnlyRootFilesystem: true  # <--- ADD: The big one. Makes root strictly read-only.
+            allowPrivilegeEscalation: false # <--- ADD: Prevent sudo-like behavior
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: PUID
               value: "1000"
@@ -51,6 +63,10 @@ spec:
               mountPath: /config
             - name: media
               mountPath: /media
+            - name: tmp                   # <--- ADD
+              mountPath: /tmp             # <--- ADD
+            - name: run                   # <--- ADD
+              mountPath: /run             # <--- ADD
           resources:
             requests:
               cpu: 200m
@@ -81,6 +97,10 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: media-root-pvc
+        - name: tmp        # <--- ADD: Matches volumeMount above
+          emptyDir: {}
+        - name: run        # <--- ADD: Matches volumeMount above
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -102,7 +122,6 @@ metadata:
   name: lidarr
   namespace: media
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-production
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx
