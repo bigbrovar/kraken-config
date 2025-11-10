@@ -24,19 +24,14 @@ spec:
           leaderElection:
             namespace: cert-manager
 
-        # 👇 REMOVE THIS FAILED BLOCK 👇
-        # ingressShim:
-        #   enabled: false
-        # 👆 ------------------------ 👆
-
-        # 👇 ADD THIS INSTEAD 👇
-        extraArgs:
-          - --enable-ingress-shim=false
-        # 👆 ------------------ 👆
-
         # DISABLE startup API check (causes ArgoCD conflicts)
         startupapicheck:
           enabled: false
+
+        # DISABLE ingress shim controller
+        controller:
+          extraArgs:
+            - --controllers=*,-ingress-shim
 
         # Resources
         resources:
