@@ -9,6 +9,8 @@ metadata:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/ssl-passthrough: "true"
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    cert-manager.io/issuer: "null"
+    cert-manager.io/cluster-issuer: "null"
 spec:
   ingressClassName: nginx
   tls:

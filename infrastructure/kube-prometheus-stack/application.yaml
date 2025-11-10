@@ -104,6 +104,9 @@ spec:
           ingress:
             enabled: true
             ingressClassName: nginx
+            annotations:
+              cert-manager.io/issuer: "null"
+              cert-manager.io/cluster-issuer: "null"
             hosts:
               - grafana.homelab.org.ng
             path: /
@@ -180,6 +183,9 @@ spec:
           ingress:
             enabled: true
             ingressClassName: nginx
+            annotations:
+              cert-manager.io/issuer: "null"
+              cert-manager.io/cluster-issuer: "null"
             hosts:
               - alertmanager.homelab.org.ng
             paths:
