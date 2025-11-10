@@ -29,13 +29,6 @@ spec:
       labels:
         app: radarr
     spec:
-      securityContext:
-        runAsUser: 1000        # <--- ADD: Force non-root user
-        runAsGroup: 1000       # <--- ADD: Force non-root group
-        fsGroup: 1000
-        runAsNonRoot: true     # <--- ADD: Prevent root execution
-        seccompProfile:        # <--- ADD: Kernel syscall protection
-          type: RuntimeDefault
       containers:
         - name: radarr
           image: lscr.io/linuxserver/radarr:5.15.1
@@ -45,6 +38,10 @@ spec:
             capabilities:
               drop:
                 - ALL                     # <--- ADD: Drop unneeded Linux capabilities
+              add:
+                - CHOWN
+                - SETGID
+                - SETUID
           env:
             - name: PUID
               value: "1000"
