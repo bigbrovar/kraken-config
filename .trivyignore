@@ -1,0 +1,3 @@
+# AV-KSV-0118: LSIO images must start as root to fix permissions via s6-overlay.
+# We have accepted this risk as they drop privileges immediately after startup.
+AVD-KSV-0118

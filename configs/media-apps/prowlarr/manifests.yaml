@@ -31,22 +31,20 @@ spec:
       labels:
         app: prowlarr
     spec:
-      securityContext:
-        runAsUser: 1000        # <--- ADD: Force non-root user
-        runAsGroup: 1000       # <--- ADD: Force non-root group
-        fsGroup: 1000
-        runAsNonRoot: true     # <--- ADD: Prevent root execution
-        seccompProfile:        # <--- ADD: Kernel syscall protection
-          type: RuntimeDefault
+      # REMOVED Pod-level securityContext to match Lidarr
       containers:
         - name: prowlarr
           image: lscr.io/linuxserver/prowlarr:latest
           securityContext:
-            readOnlyRootFilesystem: true  # <--- ADD: The big one. Makes root strictly read-only.
-            allowPrivilegeEscalation: false # <--- ADD: Prevent sudo-like behavior
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
             capabilities:
               drop:
-                - ALL                     # <--- ADD: Drop unneeded Linux capabilities
+                - ALL
+              add:
+                - CHOWN
+                - SETGID
+                - SETUID
           env:
             - name: PUID
               value: "1000"
@@ -60,11 +58,10 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
-            # REQUIRED FOR READ-ONLY ROOT (
-            - name: tmp                   # <--- ADD
-              mountPath: /tmp             # <--- ADD
-            - name: run                   # <--- ADD
-              mountPath: /run             # <--- ADD
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /run
           resources:
             requests:
               cpu: 100m
@@ -92,9 +89,9 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: prowlarr-config
-        - name: tmp        # <--- ADD: Matches volumeMount above
+        - name: tmp
           emptyDir: {}
-        - name: run        # <--- ADD: Matches volumeMount above
+        - name: run
           emptyDir: {}
 ---
 apiVersion: v1
