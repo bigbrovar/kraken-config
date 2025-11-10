@@ -9,6 +9,8 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: 10000m
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/issuer: "null"
+    cert-manager.io/cluster-issuer: "null"
 spec:
   ingressClassName: nginx
   tls:

@@ -116,6 +116,7 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     cert-manager.io/issuer: "null"
+    cert-manager.io/cluster-issuer: "null"
 spec:
   ingressClassName: nginx
   tls:
