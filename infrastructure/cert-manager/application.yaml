@@ -28,11 +28,6 @@ spec:
         startupapicheck:
           enabled: false
 
-        # DISABLE ingress shim controller
-        controller:
-          extraArgs:
-            - --controllers=*,-ingress-shim
-
         # Resources
         resources:
           requests:
