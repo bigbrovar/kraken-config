@@ -34,7 +34,7 @@ spec:
       containers:
         - name: jellyseerr
           # CHANGED IMAGE TO JELLYSEERR
-          image: lscr.io/linuxserver/jellyseerr:latest
+          image: fallenbagel/jellyseerr:latest
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
