@@ -36,7 +36,6 @@ spec:
           # CHANGED IMAGE TO JELLYSEERR
           image: fallenbagel/jellyseerr:latest
           securityContext:
-            readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
