@@ -18,7 +18,7 @@ data:
 
     [qbit]
     # URL to your qBittorrent VM
-    url = "http://YOUR_VM_IP:8080"
+    url = "http://172.42.0.30:8080"
 
     [folders]
     # These are sub-folders *inside* your downloads path
