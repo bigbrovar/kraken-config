@@ -67,6 +67,9 @@ metadata:
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
     nginx.ingress.kubernetes.io/limit-rps: "10"
+    # Fix for X-Forwarded-For header error
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 spec:
   ingressClassName: nginx
   tls:
