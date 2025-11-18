@@ -1,8 +1,4 @@
 ---
-# Application: searxng
-# Purpose: Privacy-respecting metasearch engine
-# Namespace: media
-# Sync Wave: 50
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -15,69 +11,12 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://charts.searxng.org
-    chart: searxng
-    targetRevision: 1.0.0
-    helm:
-      valuesObject:
-        # ========================================
-        # Resource Management
-        # ========================================
-        resources:
-          limits:
-            cpu: 500m
-            memory: 512Mi
-          requests:
-            cpu: 100m
-            memory: 256Mi
-
-        # ========================================
-        # Environment Configuration
-        # ========================================
-        env:
-          SEARXNG_BASE_URL: "https://search.homelab.org.ng"
-
-        envFrom:
-          - secretRef:
-              name: searxng-secrets
-
-        # ========================================
-        # Service Configuration
-        # ========================================
-        service:
-          main:
-            ports:
-              http:
-                port: 8080
-
-        # ========================================
-        # Ingress Configuration
-        # ========================================
-        ingress:
-          main:
-            enabled: true
-            className: "nginx"
-            annotations:
-              nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-              cert-manager.io/issuer: "null"
-              cert-manager.io/cluster-issuer: "null"
-              nginx.ingress.kubernetes.io/limit-rps: "10"
-
-            hosts:
-              - host: "search.homelab.org.ng"
-                paths:
-                  - path: /
-                    pathType: Prefix
-
-            tls:
-              - secretName: "wildcard-homelab-tls"
-                hosts:
-                  - "search.homelab.org.ng"
-
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    path: configs/media-apps/searxng
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: media
-
   syncPolicy:
     automated:
       prune: true
