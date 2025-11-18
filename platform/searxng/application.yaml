@@ -15,16 +15,11 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://searxng.github.io/helm-chart
+    repoURL: https://charts.searxng.org
     chart: searxng
-    targetRevision: 2.3.0
+    targetRevision: 1.0.0
     helm:
       valuesObject:
-        # ========================================
-        # General Settings
-        # ========================================
-        namespaceOverride: "media"
-
         # ========================================
         # Resource Management
         # ========================================
@@ -37,108 +32,47 @@ spec:
             memory: 256Mi
 
         # ========================================
-        # SearXNG Configuration
+        # Environment Configuration
         # ========================================
-        searxng:
-          resources:
-            limits:
-              cpu: 500m
-              memory: 512Mi
-            requests:
-              cpu: 100m
-              memory: 256Mi
+        env:
+          SEARXNG_BASE_URL: "https://search.homelab.org.ng"
 
-          # Load secret key from sealed secret
-          envFrom:
-            - secretRef:
-                name: searxng-secrets
-
-          config:
-            use_default_settings: true
-
-            server:
-              secret_key: ""  # Will be injected from SEARXNG_SECRET_KEY env var
-              limiter: true
-              image_proxy: true
-              method: "POST"
-
-            ui:
-              default_theme: "simple"
-              theme_args:
-                simple_style: "dark"
-
-            search:
-              safe_search: 0
-              autocomplete: "google"
-              default_lang: "en"
+        envFrom:
+          - secretRef:
+              name: searxng-secrets
 
         # ========================================
-        # Filtron (Rate Limiting)
+        # Service Configuration
         # ========================================
-        filtron:
-          enabled: true
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 50m
-              memory: 64Mi
-
-        # ========================================
-        # Morty (Image Proxy)
-        # ========================================
-        morty:
-          enabled: true
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 50m
-              memory: 64Mi
-
-        # ========================================
-        # Redis (Caching)
-        # ========================================
-        redis:
-          enabled: true
-          persistence:
-            enabled: false  # Just a cache
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-            requests:
-              cpu: 50m
-              memory: 64Mi
+        service:
+          main:
+            ports:
+              http:
+                port: 8080
 
         # ========================================
         # Ingress Configuration
         # ========================================
         ingress:
-          enabled: true
-          className: "nginx"
-          annotations:
-            # Force SSL redirect
-            nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-            # Prevent cert-manager from interfering with wildcard cert
-            cert-manager.io/issuer: "null"
-            cert-manager.io/cluster-issuer: "null"
-            # Rate limiting
-            nginx.ingress.kubernetes.io/limit-rps: "10"
+          main:
+            enabled: true
+            className: "nginx"
+            annotations:
+              nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+              cert-manager.io/issuer: "null"
+              cert-manager.io/cluster-issuer: "null"
+              nginx.ingress.kubernetes.io/limit-rps: "10"
 
-          hosts:
-            - host: "search.homelab.org.ng"
-              paths:
-                - path: /
-                  pathType: Prefix
+            hosts:
+              - host: "search.homelab.org.ng"
+                paths:
+                  - path: /
+                    pathType: Prefix
 
-          tls:
-            # Use your existing wildcard certificate
-            - secretName: "wildcard-homelab-tls"
-              hosts:
-                - "search.homelab.org.ng"
+            tls:
+              - secretName: "wildcard-homelab-tls"
+                hosts:
+                  - "search.homelab.org.ng"
 
   destination:
     server: 'https://kubernetes.default.svc'
