@@ -34,8 +34,9 @@ spec:
       # REMOVED Pod-level securityContext to match Lidarr/Sonarr pattern
       containers:
         - name: readarr
-          # Using Hotio image as discussed (supports ARM64/Pi)
-          image: hotio/readarr:latest
+          # ✅ FIXED: Added 'ghcr.io/' prefix and using 'nightly' tag
+          # Nightly is REQUIRED for Readarr to have working metadata (Goodreads fix)
+          image: ghcr.io/hotio/readarr:nightly
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
@@ -125,7 +126,7 @@ metadata:
   namespace: media
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    # Double-Lock to prevent certificate zombies
+    # 🔒 Double-Lock to prevent certificate zombies
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
 spec:
