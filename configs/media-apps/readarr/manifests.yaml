@@ -31,20 +31,19 @@ spec:
       labels:
         app: readarr
     spec:
-      # REMOVED Pod-level securityContext to allow root startup
       containers:
         - name: readarr
-          # Nightly is REQUIRED for Readarr to have working metadata (Goodreads fix)
+          # Using Hotio nightly image for ARM64 support and working metadata
           image: ghcr.io/hotio/readarr:nightly
           securityContext:
-            readOnlyRootFilesystem: true
-            #  CRITICAL FIX: Must be true for s6-overlay to fix permissions
+            # Disabled read-only root to prevent s6-overlay permission errors on /run
+            readOnlyRootFilesystem: false
+            # Required for s6-overlay to fix permissions during startup
             allowPrivilegeEscalation: true
             capabilities:
               drop:
                 - ALL
               add:
-                # Required for s6-overlay and file ownership changes
                 - CHOWN
                 - SETGID
                 - SETUID
@@ -65,10 +64,8 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
-            # Shared media mount
             - name: media
               mountPath: /media
-            # Required for read-only root
             - name: tmp
               mountPath: /tmp
             - name: run
@@ -129,7 +126,7 @@ metadata:
   namespace: media
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    # Double-Lock to prevent certificate zombies
+    # Prevent cert-manager from interfering with the wildcard certificate
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
 spec:
