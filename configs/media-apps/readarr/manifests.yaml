@@ -34,7 +34,7 @@ spec:
       # REMOVED Pod-level securityContext to match Lidarr/Sonarr pattern
       containers:
         - name: readarr
-          # ✅ FIXED: Added 'ghcr.io/' prefix and using 'nightly' tag
+          # FIXED: Added 'ghcr.io/' prefix and using 'nightly' tag
           # Nightly is REQUIRED for Readarr to have working metadata (Goodreads fix)
           image: ghcr.io/hotio/readarr:nightly
           securityContext:
@@ -47,6 +47,9 @@ spec:
                 - CHOWN
                 - SETGID
                 - SETUID
+                # CRITICAL FIX FOR S6-OVERLAY PERMISSION ERROR
+                - DAC_OVERRIDE
+                - FOWNER
           env:
             - name: PUID
               value: "1000"
