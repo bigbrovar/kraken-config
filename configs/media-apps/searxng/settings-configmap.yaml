@@ -17,7 +17,7 @@ data:
       port: 8080
       bind_address: "0.0.0.0"
       secret_key: ""  # Set from env
-      limiter: true
+      limiter: true  # Enable with Redis
       image_proxy: true
 
     ui:
@@ -25,58 +25,37 @@ data:
       theme_args:
         simple_style: dark
 
-    # Increase timeouts to fix engine timeouts
+    # Redis URL will be set from env SEARXNG_REDIS_URL
+    redis:
+      url: redis://searxng-redis:6379/0
+
+    # Increase timeouts
     outgoing:
       request_timeout: 10.0
       max_request_timeout: 20.0
 
-    # Configure engines
+    # Disable problematic engines only
     engines:
-      # Enable reliable engines
-      - name: google
-        disabled: false
-        weight: 1
-
-      - name: duckduckgo
-        disabled: false
-        weight: 1
-
-      - name: bing
-        disabled: false
-        weight: 0.8
-
-      - name: startpage
-        disabled: false
-        weight: 0.9
-        timeout: 10.0
-
-      - name: qwant
-        disabled: false
-        weight: 0.7
-
-      - name: wikipedia
-        disabled: false
-        weight: 1.0
-
-      - name: github
-        disabled: false
-        weight: 1.0
-
-      # Disable problematic engines
-      - name: yahoo
-        disabled: true
-
       - name: yahoo news
+        engine: xpath
         disabled: true
 
       - name: brave news
+        engine: xpath
         disabled: true
 
       - name: reddit
+        engine: json_engine
         disabled: true
 
       - name: lemmy posts
+        engine: lemmy
         disabled: true
 
       - name: mastodon users
+        engine: mastodon
+        disabled: true
+
+      - name: yacy images
+        engine: yacy
         disabled: true
