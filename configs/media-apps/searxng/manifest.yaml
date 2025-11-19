@@ -25,6 +25,11 @@ spec:
           envFrom:
             - secretRef:
                 name: searxng-secrets
+          # Mount custom settings
+          volumeMounts:
+            - name: settings
+              mountPath: /etc/searxng/settings.yml
+              subPath: settings.yml
           resources:
             limits:
               cpu: 500m
@@ -44,6 +49,11 @@ spec:
               port: 8080
             initialDelaySeconds: 20
             periodSeconds: 10
+      # Add volume for settings ConfigMap
+      volumes:
+        - name: settings
+          configMap:
+            name: searxng-settings
 ---
 apiVersion: v1
 kind: Service
@@ -67,7 +77,6 @@ metadata:
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
     nginx.ingress.kubernetes.io/limit-rps: "10"
-    # Fix for X-Forwarded-For header error
     nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 spec:
