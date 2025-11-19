@@ -126,7 +126,7 @@ metadata:
   namespace: media
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    # 🔒 Double-Lock to prevent certificate zombies
+    # Double-Lock to prevent certificate zombies
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
 spec:
