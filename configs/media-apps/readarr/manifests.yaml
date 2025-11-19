@@ -1,12 +1,9 @@
 ---
-# PersistentVolumeClaim for Readarr configuration
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: readarr-config
   namespace: media
-  labels:
-    app: readarr
 spec:
   accessModes:
     - ReadWriteOnce
@@ -14,9 +11,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
-
 ---
-# Readarr Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -27,7 +22,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: Recreate  # Required for ReadWriteOnce PVC
+    type: Recreate
   selector:
     matchLabels:
       app: readarr
@@ -36,22 +31,14 @@ spec:
       labels:
         app: readarr
     spec:
-      # Force scheduling to x86_64 node only
-      nodeSelector:
-        kubernetes.io/arch: amd64
-
+      # REMOVED Pod-level securityContext to match Lidarr/Sonarr pattern
       containers:
         - name: readarr
-          image: lscr.io/linuxserver/readarr:develop
-          imagePullPolicy: IfNotPresent
-
-          # Container-level security context
+          # Using Hotio image as discussed (supports ARM64/Pi)
+          image: hotio/readarr:latest
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
-            runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
             capabilities:
               drop:
                 - ALL
@@ -59,8 +46,6 @@ spec:
                 - CHOWN
                 - SETGID
                 - SETUID
-
-          # Environment variables
           env:
             - name: PUID
               value: "1000"
@@ -69,26 +54,21 @@ spec:
             - name: TZ
               value: "Africa/Lagos"
             - name: UMASK
-              value: "022"
-
-          # Container ports
+              value: "002"
           ports:
-            - name: http
-              containerPort: 8787
-              protocol: TCP
-
-          # Volume mounts
+            - containerPort: 8787
+              name: http
           volumeMounts:
             - name: config
               mountPath: /config
+            # Shared media mount
             - name: media
               mountPath: /media
+            # Required for read-only root
             - name: tmp
               mountPath: /tmp
             - name: run
               mountPath: /run
-
-          # Resource limits and requests
           resources:
             requests:
               cpu: 100m
@@ -96,44 +76,22 @@ spec:
             limits:
               cpu: 1000m
               memory: 1Gi
-
-          # Liveness probe
           livenessProbe:
             httpGet:
               path: /ping
               port: http
-              scheme: HTTP
             initialDelaySeconds: 60
             periodSeconds: 10
             timeoutSeconds: 5
-            successThreshold: 1
             failureThreshold: 6
-
-          # Readiness probe
           readinessProbe:
             httpGet:
               path: /ping
               port: http
-              scheme: HTTP
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
-            successThreshold: 1
             failureThreshold: 6
-
-          # Startup probe (gives extra time for first boot)
-          startupProbe:
-            httpGet:
-              path: /ping
-              port: http
-              scheme: HTTP
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 5
-            successThreshold: 1
-            failureThreshold: 30  # 150 seconds total
-
-      # Volumes
       volumes:
         - name: config
           persistentVolumeClaim:
@@ -145,20 +103,12 @@ spec:
           emptyDir: {}
         - name: run
           emptyDir: {}
-
-      # DNS configuration
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-
 ---
-# Readarr Service
 apiVersion: v1
 kind: Service
 metadata:
   name: readarr
   namespace: media
-  labels:
-    app: readarr
 spec:
   type: ClusterIP
   selector:
@@ -167,37 +117,17 @@ spec:
     - name: http
       port: 8787
       targetPort: http
-      protocol: TCP
-  sessionAffinity: None
-
 ---
-# Readarr Ingress
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: readarr
   namespace: media
-  labels:
-    app: readarr
   annotations:
-    # Force HTTPS redirect
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-
-    # Prevent cert-manager from interfering with wildcard cert
+    # Double-Lock to prevent certificate zombies
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
-
-    # Increase proxy timeouts for large book uploads
-    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-
-    # Enable HSTS
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      more_set_headers "X-Frame-Options: SAMEORIGIN";
-      more_set_headers "X-Content-Type-Options: nosniff";
-      more_set_headers "X-XSS-Protection: 1; mode=block";
 spec:
   ingressClassName: nginx
   tls:
