@@ -31,23 +31,23 @@ spec:
       labels:
         app: readarr
     spec:
-      # REMOVED Pod-level securityContext to match Lidarr/Sonarr pattern
+      # REMOVED Pod-level securityContext to allow root startup
       containers:
         - name: readarr
-          # FIXED: Added 'ghcr.io/' prefix and using 'nightly' tag
           # Nightly is REQUIRED for Readarr to have working metadata (Goodreads fix)
           image: ghcr.io/hotio/readarr:nightly
           securityContext:
             readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
+            #  CRITICAL FIX: Must be true for s6-overlay to fix permissions
+            allowPrivilegeEscalation: true
             capabilities:
               drop:
                 - ALL
               add:
+                # Required for s6-overlay and file ownership changes
                 - CHOWN
                 - SETGID
                 - SETUID
-                # CRITICAL FIX FOR S6-OVERLAY PERMISSION ERROR
                 - DAC_OVERRIDE
                 - FOWNER
           env:
