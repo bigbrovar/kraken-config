@@ -1,4 +1,45 @@
 ---
+# Redis for SearXNG limiter and caching
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: searxng-redis
+  namespace: media
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: searxng-redis
+  template:
+    metadata:
+      labels:
+        app: searxng-redis
+    spec:
+      containers:
+        - name: redis
+          image: valkey/valkey:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: searxng-redis
+  namespace: media
+spec:
+  selector:
+    app: searxng-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,10 +63,11 @@ spec:
           env:
             - name: SEARXNG_BASE_URL
               value: "https://search.homelab.org.ng"
+            - name: SEARXNG_REDIS_URL
+              value: "redis://searxng-redis:6379/0"
           envFrom:
             - secretRef:
                 name: searxng-secrets
-          # Mount custom settings
           volumeMounts:
             - name: settings
               mountPath: /etc/searxng/settings.yml
@@ -49,7 +91,6 @@ spec:
               port: 8080
             initialDelaySeconds: 20
             periodSeconds: 10
-      # Add volume for settings ConfigMap
       volumes:
         - name: settings
           configMap:
