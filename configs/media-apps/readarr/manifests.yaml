@@ -40,7 +40,7 @@ spec:
         - name: readarr
           image: lscr.io/linuxserver/readarr:latest
           imagePullPolicy: IfNotPresent
-          
+
           # Container-level security context
           securityContext:
             readOnlyRootFilesystem: true
@@ -55,7 +55,7 @@ spec:
                 - CHOWN
                 - SETGID
                 - SETUID
-          
+
           # Environment variables
           env:
             - name: PUID
@@ -66,13 +66,13 @@ spec:
               value: "Africa/Lagos"
             - name: UMASK
               value: "022"
-          
+
           # Container ports
           ports:
             - name: http
               containerPort: 8787
               protocol: TCP
-          
+
           # Volume mounts
           volumeMounts:
             - name: config
@@ -83,7 +83,7 @@ spec:
               mountPath: /tmp
             - name: run
               mountPath: /run
-          
+
           # Resource limits and requests
           resources:
             requests:
@@ -92,7 +92,7 @@ spec:
             limits:
               cpu: 1000m
               memory: 1Gi
-          
+
           # Liveness probe
           livenessProbe:
             httpGet:
@@ -104,7 +104,7 @@ spec:
             timeoutSeconds: 5
             successThreshold: 1
             failureThreshold: 6
-          
+
           # Readiness probe
           readinessProbe:
             httpGet:
@@ -116,7 +116,7 @@ spec:
             timeoutSeconds: 5
             successThreshold: 1
             failureThreshold: 6
-          
+
           # Startup probe (gives extra time for first boot)
           startupProbe:
             httpGet:
@@ -128,7 +128,7 @@ spec:
             timeoutSeconds: 5
             successThreshold: 1
             failureThreshold: 30  # 150 seconds total
-      
+
       # Volumes
       volumes:
         - name: config
@@ -141,7 +141,7 @@ spec:
           emptyDir: {}
         - name: run
           emptyDir: {}
-      
+
       # DNS configuration
       dnsPolicy: ClusterFirst
       restartPolicy: Always
@@ -178,17 +178,17 @@ metadata:
   annotations:
     # Force HTTPS redirect
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    
+
     # Prevent cert-manager from interfering with wildcard cert
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
-    
+
     # Increase proxy timeouts for large book uploads
     nginx.ingress.kubernetes.io/proxy-body-size: "500m"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-    
+
     # Enable HSTS
     nginx.ingress.kubernetes.io/configuration-snippet: |
       more_set_headers "X-Frame-Options: SAMEORIGIN";
