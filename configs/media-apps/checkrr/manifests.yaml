@@ -29,6 +29,8 @@ data:
       debug: false
       csvfile: /data/checkrr.csv
       logfile: /data/checkrr.log
+      # Added schedule to fix "Waiting for next run" error
+      cron: "@every 24h"
 
     process:
       ffmpeg: true
@@ -38,7 +40,7 @@ data:
       port: 8585
       trustedproxies: ["0.0.0.0/0"]
 
-    # Leave API keys blank here; they are injected by Deployment environment variables
+    # API keys injected via Env Vars
     sonarr:
       - url: http://sonarr:8989
         tag_label: "corrupt"
@@ -76,7 +78,6 @@ spec:
 
       containers:
         - name: checkrr
-          # Using specific architecture tag
           image: ghcr.io/aetaric/checkrr:latest-amd64
           imagePullPolicy: IfNotPresent
 
@@ -95,7 +96,6 @@ spec:
               value: "Africa/Lagos"
 
             # Secure Injection (Overrides config file)
-            # Syntax: CHECKRR__SECTION__INDEX__KEY
             - name: CHECKRR__SONARR__0__APIKEY
               valueFrom:
                 secretKeyRef:
