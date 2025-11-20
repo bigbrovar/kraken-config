@@ -23,8 +23,11 @@ metadata:
 data:
   checkrr.yaml: |
     checkrr:
-      rootdir: ["/media/Movies", "/media/Movies-2", "/media/TV-Series", "/media/TV-Series-2"]
-      checkpath: []
+      checkpath:
+        - /media/Movies
+        - /media/Movies-2
+        - /media/TV-Series
+        - /media/TV-Series-2
       database: /data/checkrr.db
       debug: false
       csvfile: /data/checkrr.csv
