@@ -23,27 +23,26 @@ metadata:
 data:
   checkrr.yaml: |
     checkrr:
-      # Added Movies-2 and TV-Series-2 to the scan list
       rootdir: ["/media/Movies", "/media/Movies-2", "/media/TV-Series", "/media/TV-Series-2"]
       checkpath: []
       database: /data/checkrr.db
       debug: false
       csvfile: /data/checkrr.csv
       logfile: /data/checkrr.log
-
+      
     process:
       ffmpeg: true
       hash: false
-
+      
     webserver:
       port: 8585
       trustedproxies: ["0.0.0.0/0"]
-
-    # URLs are defined here, but keys are injected via Env Vars below
+      
+    # Leave API keys blank here; they are injected by Deployment environment variables
     sonarr:
       - url: http://sonarr:8989
         tag_label: "corrupt"
-
+        
     radarr:
       - url: http://radarr:7878
         tag_label: "corrupt"
@@ -68,15 +67,19 @@ spec:
       labels:
         app: checkrr
     spec:
+      # Force AMD64 nodes (HP Minis)
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      
       securityContext:
         fsGroup: 1000
-
+      
       containers:
         - name: checkrr
-          image: ghcr.io/aetaric/checkrr:latest
+          # Using specific architecture tag
+          image: ghcr.io/aetaric/checkrr:latest-amd64
           imagePullPolicy: IfNotPresent
-
-          # Standard hardening (Safe for Go apps)
+          
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
@@ -86,34 +89,30 @@ spec:
             capabilities:
               drop:
                 - ALL
-
+          
           env:
             - name: TZ
               value: "Africa/Lagos"
-
-            # SECURE INJECTION (Overrides config file)
-            # This specific syntax overrides config file settings:
-            # CHECKRR__<SECTION>__<INDEX>__<KEY>
-
-            # Override sonarr[0].apikey
+            
+            # Secure Injection (Overrides config file)
+            # Syntax: CHECKRR__SECTION__INDEX__KEY
             - name: CHECKRR__SONARR__0__APIKEY
               valueFrom:
                 secretKeyRef:
                   name: checkrr-secrets
                   key: sonarr-apikey
-
-            # Override radarr[0].apikey
+            
             - name: CHECKRR__RADARR__0__APIKEY
               valueFrom:
                 secretKeyRef:
                   name: checkrr-secrets
                   key: radarr-apikey
-
+          
           ports:
             - name: http
               containerPort: 8585
               protocol: TCP
-
+          
           volumeMounts:
             - name: config
               mountPath: /etc/checkrr.yaml
@@ -128,7 +127,7 @@ spec:
               mountPath: /tmp
             - name: cache
               mountPath: /var/cache
-
+          
           resources:
             requests:
               cpu: 500m
@@ -136,8 +135,7 @@ spec:
             limits:
               cpu: 2000m
               memory: 2Gi
-
-          # Startup probe: 30 mins is generous but safe for big DB initializations
+              
           startupProbe:
             httpGet:
               path: /
@@ -145,8 +143,8 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 180
-
+            failureThreshold: 180 
+          
           livenessProbe:
             httpGet:
               path: /
@@ -159,7 +157,7 @@ spec:
               port: http
             initialDelaySeconds: 10
             periodSeconds: 10
-
+            
       volumes:
         - name: config
           configMap:
@@ -204,9 +202,6 @@ metadata:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
-    # Increase timeouts for long-running scans
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
 spec:
   ingressClassName: nginx
