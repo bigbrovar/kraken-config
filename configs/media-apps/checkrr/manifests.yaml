@@ -34,6 +34,21 @@ data:
       logfile: /data/checkrr.log
       # Added schedule to fix "Waiting for next run" error
       cron: "@every 24h"
+      # Ignore non-media files
+      ignore:
+        - "*.nfo"
+        - "*.txt"
+        - "*.svg"
+        - "*.jpg"
+        - "*.jpeg"
+        - "*.png"
+        - "*.gif"
+        - "*.srt"
+        - "*.sub"
+        - "*.ass"
+        - "*.ssa"
+        - "*.json"
+        - "*.xml"
 
     process:
       ffmpeg: true
