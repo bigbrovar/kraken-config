@@ -29,20 +29,20 @@ data:
       debug: false
       csvfile: /data/checkrr.csv
       logfile: /data/checkrr.log
-      
+
     process:
       ffmpeg: true
       hash: false
-      
+
     webserver:
       port: 8585
       trustedproxies: ["0.0.0.0/0"]
-      
+
     # Leave API keys blank here; they are injected by Deployment environment variables
     sonarr:
       - url: http://sonarr:8989
         tag_label: "corrupt"
-        
+
     radarr:
       - url: http://radarr:7878
         tag_label: "corrupt"
@@ -70,16 +70,16 @@ spec:
       # Force AMD64 nodes (HP Minis)
       nodeSelector:
         kubernetes.io/arch: amd64
-      
+
       securityContext:
         fsGroup: 1000
-      
+
       containers:
         - name: checkrr
           # Using specific architecture tag
           image: ghcr.io/aetaric/checkrr:latest-amd64
           imagePullPolicy: IfNotPresent
-          
+
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
@@ -89,11 +89,11 @@ spec:
             capabilities:
               drop:
                 - ALL
-          
+
           env:
             - name: TZ
               value: "Africa/Lagos"
-            
+
             # Secure Injection (Overrides config file)
             # Syntax: CHECKRR__SECTION__INDEX__KEY
             - name: CHECKRR__SONARR__0__APIKEY
@@ -101,18 +101,18 @@ spec:
                 secretKeyRef:
                   name: checkrr-secrets
                   key: sonarr-apikey
-            
+
             - name: CHECKRR__RADARR__0__APIKEY
               valueFrom:
                 secretKeyRef:
                   name: checkrr-secrets
                   key: radarr-apikey
-          
+
           ports:
             - name: http
               containerPort: 8585
               protocol: TCP
-          
+
           volumeMounts:
             - name: config
               mountPath: /etc/checkrr.yaml
@@ -127,7 +127,7 @@ spec:
               mountPath: /tmp
             - name: cache
               mountPath: /var/cache
-          
+
           resources:
             requests:
               cpu: 500m
@@ -135,7 +135,7 @@ spec:
             limits:
               cpu: 2000m
               memory: 2Gi
-              
+
           startupProbe:
             httpGet:
               path: /
@@ -143,8 +143,8 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 180 
-          
+            failureThreshold: 180
+
           livenessProbe:
             httpGet:
               path: /
@@ -157,7 +157,7 @@ spec:
               port: http
             initialDelaySeconds: 10
             periodSeconds: 10
-            
+
       volumes:
         - name: config
           configMap:
