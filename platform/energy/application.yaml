@@ -1,0 +1,25 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: energy
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    path: configs/energy
+    directory:
+      recurse: true
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: energy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
