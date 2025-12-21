@@ -1,0 +1,43 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mosquitto
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+  annotations:
+    # Standard workload sync wave
+    argocd.argoproj.io/sync-wave: "50"
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    # Point directly to the mosquitto config folder
+    path: configs/energy/mosquitto
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: energy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  # Specific workarounds for Mosquitto/MetalLB
+  ignoreDifferences:
+    # Ignore LoadBalancer status updates from MetalLB
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /status/loadBalancer
