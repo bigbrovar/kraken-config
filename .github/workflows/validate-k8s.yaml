@@ -54,6 +54,8 @@ jobs:
             -schema-location "${DATREE_SCHEMA}" \
             -schema-location "${CERTMGR_SCHEMA}" \
             -schema-location "${SEALED_SCHEMA}" \
+            -ignore-filename-pattern "Chart.yaml" \
+            -ignore-filename-pattern "values.yaml" \
             configs/
       # CHECK 3: Security Scan
       - name: Set up Trivy
