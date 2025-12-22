@@ -7,18 +7,29 @@ metadata:
   finalizers:
     - resources-finalizer.argoproj.io
   annotations:
-    # Standard workload sync wave
     argocd.argoproj.io/sync-wave: "50"
 spec:
   project: default
-  source:
-    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
-    targetRevision: HEAD
-    # Point directly to the mosquitto config folder
-    path: configs/energy/mosquitto
+
+  # Multiple Sources Pattern
+  sources:
+    # Source 1: Official Bitnami Chart (try HTTPS first)
+    - repoURL: 'https://charts.bitnami.com/bitnami'
+      chart: mosquitto
+      targetRevision: 4.22.2
+      helm:
+        valueFiles:
+          - $values/configs/energy/mosquitto/values.yaml
+
+    # Source 2: Your Git Repo (values.yaml)
+    - repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+      targetRevision: HEAD
+      ref: values
+
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: energy
+
   syncPolicy:
     automated:
       prune: true
@@ -34,9 +45,7 @@ spec:
         factor: 2
         maxDuration: 3m
 
-  # Specific workarounds for Mosquitto/MetalLB
   ignoreDifferences:
-    # Ignore LoadBalancer status updates from MetalLB
     - group: ""
       kind: Service
       jsonPointers:

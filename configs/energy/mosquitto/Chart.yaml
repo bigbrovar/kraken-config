@@ -1,8 +1,0 @@
----
-apiVersion: v2
-name: mosquitto-stack
-version: 1.0.0
-dependencies:
-  - name: mosquitto
-    version: 4.23.1
-    repository: https://charts.bitnami.com/bitnami
