@@ -16,7 +16,7 @@ spec:
     # Source 1: Official Bitnami Chart (try HTTPS first)
     - repoURL: 'https://charts.bitnami.com/bitnami'
       chart: mosquitto
-      targetRevision: 4.22.2
+      targetRevision: 4.23.1
       helm:
         valueFiles:
           - $values/configs/energy/mosquitto/values.yaml
