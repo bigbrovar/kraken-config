@@ -10,27 +10,14 @@ metadata:
     argocd.argoproj.io/sync-wave: "50"
 spec:
   project: default
-
-  sources:
-    # Source 1: OCI Chart from Bitnami (via Docker Hub)
-    # ArgoCD will automatically use the dockerhub-bitnami secret
-    # based on matching repoURL
-    - repoURL: 'registry-1.docker.io/bitnamicharts'
-      chart: mosquitto
-      targetRevision: 4.22.2
-      helm:
-        valueFiles:
-          - $values/configs/energy/mosquitto/values.yaml
-
-    # Source 2: Your Git Repo (values.yaml)
-    - repoURL: 'https://github.com/bigbrovar/kraken-config.git'
-      targetRevision: HEAD
-      ref: values
-
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    # Point directly to the folder containing your new manifests.yaml
+    path: configs/energy/mosquitto
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: energy
-
   syncPolicy:
     automated:
       prune: true
@@ -45,7 +32,6 @@ spec:
         duration: 10s
         factor: 2
         maxDuration: 3m
-
   ignoreDifferences:
     - group: ""
       kind: Service
