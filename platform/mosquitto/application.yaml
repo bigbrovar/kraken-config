@@ -11,12 +11,13 @@ metadata:
 spec:
   project: default
 
-  # Multiple Sources Pattern
   sources:
-    # Source 1: Official Bitnami Chart (try HTTPS first)
-    - repoURL: 'https://charts.bitnami.com/bitnami'
+    # Source 1: OCI Chart from Bitnami (via Docker Hub)
+    # ArgoCD will automatically use the dockerhub-bitnami secret
+    # based on matching repoURL
+    - repoURL: 'registry-1.docker.io/bitnamicharts'
       chart: mosquitto
-      targetRevision: 4.23.1
+      targetRevision: 4.22.2
       helm:
         valueFiles:
           - $values/configs/energy/mosquitto/values.yaml
