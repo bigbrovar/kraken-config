@@ -1,0 +1,39 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mosquitto
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "50"
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    # Point directly to the folder containing your new manifests.yaml
+    path: configs/energy/mosquitto
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: energy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /status/loadBalancer
