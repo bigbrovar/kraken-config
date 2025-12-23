@@ -1,0 +1,123 @@
+---
+# 1. ConfigMap: Mosquitto Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mosquitto-config
+  namespace: energy
+data:
+  mosquitto.conf: |
+    # Persistence
+    persistence true
+    persistence_location /mosquitto/data/
+    log_dest stdout
+
+    # Authentication
+    # Points to the file mounted from the Sealed Secret
+    password_file /mosquitto/auth/password_file
+    allow_anonymous false
+
+    # Listener 1: MQTTS (Secure) - Port 8883
+    listener 8883
+    protocol mqtt
+    # TLS Configuration (using reflected wildcard cert)
+    keyfile /mosquitto/certs/tls.key
+    certfile /mosquitto/certs/tls.crt
+    require_certificate false
+
+    # Listener 2: MQTT (Insecure/Local) - Port 1883
+    listener 1883
+    protocol mqtt
+
+---
+# 2. PVC: Persistent Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mosquitto-data
+  namespace: energy
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# 3. Deployment: The Application
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+  namespace: energy
+  labels:
+    app: mosquitto
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mosquitto
+  template:
+    metadata:
+      labels:
+        app: mosquitto
+    spec:
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:2.0
+          ports:
+            - containerPort: 8883
+              name: mqtts
+            - containerPort: 1883
+              name: mqtt
+          volumeMounts:
+            - name: config
+              mountPath: /mosquitto/config/mosquitto.conf
+              subPath: mosquitto.conf
+            - name: data
+              mountPath: /mosquitto/data
+            - name: certs
+              mountPath: /mosquitto/certs
+              readOnly: true
+            - name: auth
+              mountPath: /mosquitto/auth
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: mosquitto-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: mosquitto-data
+        # Mount the Sealed Secret
+        - name: auth
+          secret:
+            secretName: mosquitto-auth
+        # Mount the Wildcard Cert (Reflector copies this to 'energy' namespace)
+        - name: certs
+          secret:
+            secretName: wildcard-homelab-tls
+
+---
+# 4. Service: Expose via MetalLB (Static IP)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mosquitto
+  namespace: energy
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: 172.42.1.200
+spec:
+  type: LoadBalancer
+  selector:
+    app: mosquitto
+  ports:
+    - name: mqtts
+      port: 8883
+      targetPort: 8883
+      protocol: TCP
+    - name: mqtt
+      port: 1883
+      targetPort: 1883
+      protocol: TCP
