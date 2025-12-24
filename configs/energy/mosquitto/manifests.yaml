@@ -10,7 +10,17 @@ data:
     # Persistence
     persistence true
     persistence_location /mosquitto/data/
+
+    # Logging - enable werbose auth log
     log_dest stdout
+    log_dest stdout
+    log_type error
+    log_type warning
+    log_type notice
+    log_type information
+    # CRITICAL FOR DEBUGGING
+    log_type debug
+    connection_messages true
 
     # Authentication
     # Points to the file mounted from the Sealed Secret
