@@ -10,7 +10,7 @@ data:
     # Persistence
     persistence true
     persistence_location /mosquitto/data/
-    
+
     # Logging - enable werbose auth log
     log_dest stdout
     log_dest stdout
