@@ -64,7 +64,7 @@ jobs:
           TRIVY_REPO="https://raw.githubusercontent.com"
           TRIVY_REPO="${TRIVY_REPO}/aquasecurity/trivy/main"
           TRIVY_INSTALL_SCRIPT="${TRIVY_REPO}/contrib/install.sh"
-          curl -sfL "${TRIVY_INSTALL_SCRIPT}" | sh -s -- -b /usr/local/bin
+          curl -sfL "${TRIVY_INSTALL_SCRIPT}" | sh -s -- -b /usr/local/bin v0.58.1
       - name: Run Trivy
         run: |
           # Break long command onto new lines
