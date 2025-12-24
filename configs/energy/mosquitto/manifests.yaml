@@ -63,6 +63,10 @@ spec:
       labels:
         app: mosquitto
     spec:
+      # ADDED: Ensures the container can write to the PVC
+      securityContext:
+        fsGroup: 1883
+
       containers:
         - name: mosquitto
           image: eclipse-mosquitto:2.0
