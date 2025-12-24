@@ -1,0 +1,164 @@
+---
+# 1. PVC: Persistent Storage for Database
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: influxdb-data
+  namespace: energy
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+# 2. ConfigMap: InfluxDB Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-config
+  namespace: energy
+data:
+  # Basic config to bind to all interfaces
+  config.yaml: |
+    http-bind-address: ":8086"
+    reporting-disabled: true
+
+---
+# 3. Deployment: InfluxDB v2
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: influxdb
+  namespace: energy
+  labels:
+    app: influxdb
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # Required for ReadWriteOnce PVC
+  selector:
+    matchLabels:
+      app: influxdb
+  template:
+    metadata:
+      labels:
+        app: influxdb
+    spec:
+      # Optional: Force it to run on AMD64 nodes (HP Minis/VMs)
+      nodeSelector:
+        kubernetes.io/arch: amd64
+
+      containers:
+        - name: influxdb
+          image: influxdb:2.7
+          ports:
+            - containerPort: 8086
+              name: http
+
+          # Configuration via Environment Variables
+          env:
+            # Initial Setup Mode
+            - name: DOCKER_INFLUXDB_INIT_MODE
+              value: "setup"
+
+            # Setup Details (Org/Bucket)
+            - name: DOCKER_INFLUXDB_INIT_ORG
+              value: "homelab"
+            - name: DOCKER_INFLUXDB_INIT_BUCKET
+              value: "solar"
+
+            # Secure Credentials from Sealed Secret
+            - name: DOCKER_INFLUXDB_INIT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-auth
+                  key: admin-user
+            - name: DOCKER_INFLUXDB_INIT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-auth
+                  key: admin-password
+            - name: DOCKER_INFLUXDB_INIT_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-auth
+                  key: admin-token
+
+          # Storage & Config Mounts
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/influxdb2
+            - name: config
+              mountPath: /etc/influxdb2
+
+          # Health Checks
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            timeoutSeconds: 1
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: influxdb-data
+        - name: config
+          configMap:
+            name: influxdb-config
+
+---
+# 4. Service: Internal Access
+apiVersion: v1
+kind: Service
+metadata:
+  name: influxdb
+  namespace: energy
+spec:
+  type: ClusterIP
+  selector:
+    app: influxdb
+  ports:
+    - name: http
+      port: 8086
+      targetPort: 8086
+      protocol: TCP
+
+---
+# 5. Ingress: External Access (Optional, for Web UI)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: influxdb
+  namespace: energy
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # 🔒 DOUBLE-LOCK: Stop cert-manager from overwriting the secret
+    cert-manager.io/issuer: "null"
+    cert-manager.io/cluster-issuer: "null"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - influxdb.homelab.org.ng
+      secretName: wildcard-homelab-tls
+  rules:
+    - host: influxdb.homelab.org.ng
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: influxdb
+                port:
+                  name: http
