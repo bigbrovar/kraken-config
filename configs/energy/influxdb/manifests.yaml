@@ -51,6 +51,12 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
 
+      # FIXED: Ensure volumes (like /tmp) are writable by the influxdb user (1000)
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+
       containers:
         - name: influxdb
           image: influxdb:2.7
@@ -60,7 +66,6 @@ spec:
 
           env:
             # FIX: Point directly to the FILE, not the directory.
-            # This prevents InfluxDB from trying to parse Kubernetes hidden files.
             - name: INFLUXD_CONFIG_PATH
               value: /etc/influxdb2-config/config.yaml
 
