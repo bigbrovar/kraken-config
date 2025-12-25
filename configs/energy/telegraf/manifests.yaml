@@ -1,0 +1,110 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: telegraf-config
+  namespace: energy
+data:
+  telegraf.conf: |
+    [agent]
+      interval = "10s"
+      round_interval = true
+      metric_batch_size = 1000
+      metric_buffer_limit = 10000
+      collection_jitter = "0s"
+      flush_interval = "10s"
+      flush_jitter = "0s"
+      precision = ""
+      debug = false
+      quiet = false
+      hostname = "k3s-telegraf"
+      omit_hostname = false
+
+    [[outputs.influxdb_v2]]
+      urls = ["http://influxdb.energy.svc.cluster.local:8086"]
+      token = "$INFLUX_TOKEN"
+      organization = "homelab"
+      bucket = "solar"
+
+    [[inputs.mqtt_consumer]]
+      servers = ["tcp://mosquitto.energy.svc.cluster.local:1883"]
+
+      topics = [
+        "helio/#"
+      ]
+
+      username = "$MQTT_USERNAME"
+      password = "$MQTT_PASSWORD"
+
+      data_format = "json"
+      json_string_fields = []
+
+      [inputs.mqtt_consumer.tags]
+        source = "victron"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telegraf
+  namespace: energy
+  labels:
+    app: telegraf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: telegraf
+  template:
+    metadata:
+      labels:
+        app: telegraf
+    spec:
+      containers:
+        - name: telegraf
+          image: telegraf:1.29
+
+          env:
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: telegraf-secrets
+                  key: influx-token
+            - name: MQTT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: telegraf-secrets
+                  key: mqtt-username
+            - name: MQTT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: telegraf-secrets
+                  key: mqtt-password
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+          volumeMounts:
+            - name: config
+              mountPath: /etc/telegraf/telegraf.conf
+              subPath: telegraf.conf
+              readOnly: true
+
+          livenessProbe:
+            exec:
+              command:
+                - telegraf
+                - --test
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+
+      volumes:
+        - name: config
+          configMap:
+            name: telegraf-config
