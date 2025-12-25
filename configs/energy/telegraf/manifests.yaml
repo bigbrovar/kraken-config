@@ -36,8 +36,8 @@ data:
       username = "$MQTT_USERNAME"
       password = "$MQTT_PASSWORD"
 
-      data_format = "json"
-      json_string_fields = []
+      data_format = "value"
+      data_type = "float"
 
       [inputs.mqtt_consumer.tags]
         source = "victron"
