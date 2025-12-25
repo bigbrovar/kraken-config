@@ -92,9 +92,12 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/influxdb2
-            # Mount config directory to a custom path to avoid permission issues
+            # Mount config to a custom path to avoid permission issues
             - name: config
               mountPath: /etc/influxdb2-config
+            # ADD THIS MOUNT
+            - name: tmp
+              mountPath: /tmp
 
           # Health Checks
           livenessProbe:
@@ -117,6 +120,9 @@ spec:
         - name: config
           configMap:
             name: influxdb-config
+        # ADD THIS VOLUME
+        - name: tmp
+          emptyDir: {}
 
 ---
 # 4. Service: Internal Access
