@@ -47,7 +47,7 @@ spec:
       labels:
         app: influxdb
     spec:
-      # Optional: Force it to run on AMD64 nodes (HP Minis/VMs)
+      # Optional: Force it to run on AMD64 nodes (HP Minis/VMs) for better IO
       nodeSelector:
         kubernetes.io/arch: amd64
 
@@ -58,13 +58,14 @@ spec:
             - containerPort: 8086
               name: http
 
-          # Configuration via Environment Variables
           env:
-            # Initial Setup Mode
+            # FIX: Tell InfluxDB explicitly where the config file is
+            # This prevents the entrypoint from trying to chown /etc/influxdb2 (which is read-only)
+            - name: INFLUXD_CONFIG_PATH
+              value: /etc/influxdb2-config
+
             - name: DOCKER_INFLUXDB_INIT_MODE
               value: "setup"
-
-            # Setup Details (Org/Bucket)
             - name: DOCKER_INFLUXDB_INIT_ORG
               value: "homelab"
             - name: DOCKER_INFLUXDB_INIT_BUCKET
@@ -91,8 +92,9 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/influxdb2
+            # Mount config to a custom path to avoid permission issues
             - name: config
-              mountPath: /etc/influxdb2
+              mountPath: /etc/influxdb2-config
 
           # Health Checks
           livenessProbe:
@@ -142,7 +144,6 @@ metadata:
   namespace: energy
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    # 🔒 DOUBLE-LOCK: Stop cert-manager from overwriting the secret
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
 spec:
