@@ -33,14 +33,14 @@ data:
     # -----------------------------------------------------------------
     connection openculture-bridge
     address ${REMOTE_ADDRESS}
-    
+
     # Topic mapping: Forward 'helio/#' locally to 'helio/#' remotely
     topic helio/# out 1
-    
+
     # Remote Authentication (Injected)
     remote_username ${REMOTE_USERNAME}
     remote_password ${REMOTE_PASSWORD}
-    
+
     # Bridge TLS settings (Required for port 8883)
     bridge_capath /etc/ssl/certs
 
@@ -80,7 +80,7 @@ spec:
     spec:
       securityContext:
         fsGroup: 1883
-      
+
       # Init Container: Reads template + secrets -> writes final config
       initContainers:
         - name: config-generator
