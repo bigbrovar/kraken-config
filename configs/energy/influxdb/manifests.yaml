@@ -21,7 +21,7 @@ metadata:
   name: influxdb-config
   namespace: energy
 data:
-  # Basic config to bind to all interfaces
+  # Explicitly naming it config.yaml so InfluxDB knows how to parse it
   config.yaml: |
     http-bind-address: ":8086"
     reporting-disabled: true
@@ -59,10 +59,10 @@ spec:
               name: http
 
           env:
-            # FIX: Tell InfluxDB explicitly where the config file is
-            # This prevents the entrypoint from trying to chown /etc/influxdb2 (which is read-only)
+            # FIX: Point directly to the FILE, not the directory.
+            # This prevents InfluxDB from trying to parse Kubernetes hidden files.
             - name: INFLUXD_CONFIG_PATH
-              value: /etc/influxdb2-config
+              value: /etc/influxdb2-config/config.yaml
 
             - name: DOCKER_INFLUXDB_INIT_MODE
               value: "setup"
@@ -92,7 +92,7 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/influxdb2
-            # Mount config to a custom path to avoid permission issues
+            # Mount config directory to a custom path to avoid permission issues
             - name: config
               mountPath: /etc/influxdb2-config
 
@@ -144,6 +144,7 @@ metadata:
   namespace: energy
   annotations:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # DOUBLE-LOCK: Stop cert-manager from overwriting the secret
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
 spec:
