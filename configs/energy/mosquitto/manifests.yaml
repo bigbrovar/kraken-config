@@ -1,36 +1,25 @@
 ---
-# 1. ConfigMap: Mosquitto Configuration
+# 1. ConfigMap: Mosquitto Configuration TEMPLATE
+# We use a template so we can inject secrets (remote user/pass) at runtime
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mosquitto-config
   namespace: energy
 data:
-  mosquitto.conf: |
+  mosquitto.conf.template: |
     # Persistence
     persistence true
     persistence_location /mosquitto/data/
-
-    # Logging - enable werbose auth log
     log_dest stdout
-    log_dest stdout
-    log_type error
-    log_type warning
-    log_type notice
-    log_type information
-    # CRITICAL FOR DEBUGGING
-    log_type debug
-    connection_messages true
 
     # Authentication
-    # Points to the file mounted from the Sealed Secret
     password_file /mosquitto/auth/password_file
     allow_anonymous false
 
     # Listener 1: MQTTS (Secure) - Port 8883
     listener 8883
     protocol mqtt
-    # TLS Configuration (using reflected wildcard cert)
     keyfile /mosquitto/certs/tls.key
     certfile /mosquitto/certs/tls.crt
     require_certificate false
@@ -38,6 +27,22 @@ data:
     # Listener 2: MQTT (Insecure/Local) - Port 1883
     listener 1883
     protocol mqtt
+
+    # -----------------------------------------------------------------
+    # MQTT Bridging Configuration
+    # -----------------------------------------------------------------
+    connection openculture-bridge
+    address ${REMOTE_ADDRESS}
+
+    # Topic mapping: Forward 'helio/#' locally to 'helio/#' remotely
+    topic helio/# out 1
+
+    # Remote Authentication (Injected)
+    remote_username ${REMOTE_USERNAME}
+    remote_password ${REMOTE_PASSWORD}
+
+    # Bridge TLS settings (Required for port 8883)
+    bridge_capath /etc/ssl/certs
 
 ---
 # 2. PVC: Persistent Data
@@ -73,9 +78,41 @@ spec:
       labels:
         app: mosquitto
     spec:
-      # ADDED: Ensures the container can write to the PVC
       securityContext:
         fsGroup: 1883
+
+      # Init Container: Reads template + secrets -> writes final config
+      initContainers:
+        - name: config-generator
+          image: alpine:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              sed -e "s|\${REMOTE_ADDRESS}|$REMOTE_ADDRESS|g" \
+                  -e "s|\${REMOTE_USERNAME}|$REMOTE_USERNAME|g" \
+                  -e "s|\${REMOTE_PASSWORD}|$REMOTE_PASSWORD|g" \
+                  /config-template/mosquitto.conf.template > /config-generated/mosquitto.conf
+          env:
+            - name: REMOTE_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: mosquitto-auth
+                  key: remote_address
+            - name: REMOTE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mosquitto-auth
+                  key: remote_username
+            - name: REMOTE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mosquitto-auth
+                  key: remote_password
+          volumeMounts:
+            - name: config-template
+              mountPath: /config-template
+            - name: config-generated
+              mountPath: /config-generated
 
       containers:
         - name: mosquitto
@@ -86,7 +123,8 @@ spec:
             - containerPort: 1883
               name: mqtt
           volumeMounts:
-            - name: config
+            # Mount the GENERATED config from the shared volume
+            - name: config-generated
               mountPath: /mosquitto/config/mosquitto.conf
               subPath: mosquitto.conf
             - name: data
@@ -98,17 +136,18 @@ spec:
               mountPath: /mosquitto/auth
               readOnly: true
       volumes:
-        - name: config
+        - name: config-template
           configMap:
             name: mosquitto-config
+        # EmptyDir to share generated config between Init and Main container
+        - name: config-generated
+          emptyDir: {}
         - name: data
           persistentVolumeClaim:
             claimName: mosquitto-data
-        # Mount the Sealed Secret
         - name: auth
           secret:
             secretName: mosquitto-auth
-        # Mount the Wildcard Cert (Reflector copies this to 'energy' namespace)
         - name: certs
           secret:
             secretName: wildcard-homelab-tls
