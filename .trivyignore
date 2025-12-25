@@ -3,3 +3,5 @@ AVD-KSV-0118
 
 # AVD-KSV-0014: Flaresolverr runs a full browser and needs a writable filesystem.
 AVD-KSV-0014
+# ConfigMaps use environment variable substitution ($VAR), not hardcoded secrets.
+AVD-KSV-0109
