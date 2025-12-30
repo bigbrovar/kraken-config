@@ -51,7 +51,7 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
 
-      # FIXED: Ensure volumes (like /tmp) are writable by the influxdb user (1000)
+      # Ensure volumes (like /tmp) are writable by the influxdb user (1000)
       securityContext:
         fsGroup: 1000
         runAsUser: 1000
@@ -68,6 +68,12 @@ spec:
             # FIX: Point directly to the FILE, not the directory.
             - name: INFLUXD_CONFIG_PATH
               value: /etc/influxdb2-config/config.yaml
+
+            # FORCE DATA TO PERSISTENT VOLUME
+            - name: INFLUXD_ENGINE_PATH
+              value: /var/lib/influxdb2/engine
+            - name: INFLUXD_BOLT_PATH
+              value: /var/lib/influxdb2/influxd.bolt
 
             - name: DOCKER_INFLUXDB_INIT_MODE
               value: "setup"
@@ -97,7 +103,7 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/influxdb2
-            # Mount config to a custom path to avoid permission issues
+            # Mount config directory to a custom path to avoid permission issues
             - name: config
               mountPath: /etc/influxdb2-config
             # ADD THIS MOUNT
