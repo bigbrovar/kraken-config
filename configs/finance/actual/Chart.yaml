@@ -5,4 +5,4 @@ version: 1.0.0
 dependencies:
   - name: actual
     version: 4.4.2 # Check for the latest stable version
-    repository: https://bjw-s.github.io/helm-charts/
+    repository: oci://ghcr.io/bjw-s/charts
