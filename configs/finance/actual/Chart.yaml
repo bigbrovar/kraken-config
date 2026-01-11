@@ -5,5 +5,5 @@ version: 1.0.0
 dependencies:
   - name: app-template
     version: 3.6.0
-    repository: oci://ghcr.io/bjw-s-labs/helm  
+    repository: oci://ghcr.io/bjw-s-labs/helm
     alias: actual
