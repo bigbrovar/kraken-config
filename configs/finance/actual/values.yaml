@@ -1,54 +1,38 @@
 ---
-actual:
-  controllers:
-    main:
-      containers:
-        main:
-          image:
-            repository: actualbudget/actual-server
-            tag: "25.1.0"
-            pullPolicy: IfNotPresent
-          resources:
-            requests:
-              cpu: 10m
-              memory: 64Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-
-  service:
-    main:
-      ports:
-        http:
-          port: 5006
-
-  ingress:
-    main:
-      enabled: true
-      className: "nginx"
-      annotations:
-        nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-        cert-manager.io/issuer: "null"
-        cert-manager.io/cluster-issuer: "null"
-      hosts:
-        - host: actual.homelab.org.ng
-          paths:
-            - path: /
-              pathType: Prefix
-              service:
-                identifier: main
-                port: http
-      tls:
-        - secretName: wildcard-homelab-tls
-          hosts:
-            - actual.homelab.org.ng
+actualbudget:
+  image:
+    repository: actualbudget/actual-server
+    tag: "25.1.0"
+    pullPolicy: IfNotPresent
 
   persistence:
-    data:
-      enabled: true
-      storageClass: "longhorn"
-      accessMode: ReadWriteOnce
-      size: 5Gi
-      type: persistentVolumeClaim
-      globalMounts:
-        - path: /data
+    enabled: true
+    size: 5Gi
+    storageClass: "longhorn"
+    accessModes:
+      - ReadWriteOnce
+
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      cert-manager.io/issuer: "null"
+      cert-manager.io/cluster-issuer: "null"
+    hosts:
+      - host: actual.homelab.org.ng
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: wildcard-homelab-tls
+        hosts:
+          - actual.homelab.org.ng
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
