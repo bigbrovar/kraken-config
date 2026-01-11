@@ -3,6 +3,7 @@ apiVersion: v2
 name: actual-stack
 version: 1.0.0
 dependencies:
-  - name: actual
-    version: 4.4.2 # Check for the latest stable version
+  - name: app-template
+    version: 3.6.0
     repository: oci://ghcr.io/bjw-s/charts
+    alias: actual
