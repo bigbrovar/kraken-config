@@ -1,16 +1,17 @@
+---
 actualbudget:
   image:
     repository: actualbudget/actual-server
     tag: "25.1.0"
     pullPolicy: IfNotPresent
-  
+
   persistence:
     enabled: true
     size: 5Gi
     storageClass: "longhorn"
     accessModes:
       - ReadWriteOnce
-  
+
   ingress:
     enabled: true
     className: "nginx"
@@ -27,7 +28,7 @@ actualbudget:
       - secretName: wildcard-homelab-tls
         hosts:
           - actual.homelab.org.ng
-  
+
   resources:
     requests:
       cpu: 10m

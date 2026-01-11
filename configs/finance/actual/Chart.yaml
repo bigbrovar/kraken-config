@@ -6,4 +6,3 @@ dependencies:
   - name: actualbudget
     version: 0.2.3
     repository: https://community-charts.github.io/helm-charts
-
