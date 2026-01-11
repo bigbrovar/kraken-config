@@ -3,7 +3,7 @@ apiVersion: v2
 name: actual-stack
 version: 1.0.0
 dependencies:
-  - name: app-template
-    version: 3.6.1
-    repository: https://bjw-s.github.io/helm-charts/
-    alias: actual
+  - name: actualbudget
+    version: 0.2.3
+    repository: https://community-charts.github.io/helm-charts
+
