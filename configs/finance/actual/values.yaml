@@ -1,26 +1,33 @@
 ---
 actual:
-  image:
-    repository: actualbudget/actual-server
-    # BEST PRACTICE: Pin to the latest stable release (Dec 2025)
-    tag: "25.12.0"
-    pullPolicy: IfNotPresent
+  controllers:
+    main:
+      containers:
+        main:
+          image:
+            repository: actualbudget/actual-server
+            tag: "25.1.0"
+            pullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
 
-  persistence:
-    data:
-      enabled: true
-      storageClass: "longhorn"
-      accessMode: ReadWriteOnce
-      # SAFER: Increased size
-      size: 5Gi
+  service:
+    main:
+      ports:
+        http:
+          port: 5006
 
   ingress:
     main:
       enabled: true
-      ingressClassName: "nginx"
+      className: "nginx"
       annotations:
         nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-        # Double-Lock to prevent certificate zombies
         cert-manager.io/issuer: "null"
         cert-manager.io/cluster-issuer: "null"
       hosts:
@@ -28,15 +35,20 @@ actual:
           paths:
             - path: /
               pathType: Prefix
+              service:
+                identifier: main
+                port: http
       tls:
         - secretName: wildcard-homelab-tls
           hosts:
             - actual.homelab.org.ng
 
-  resources:
-    requests:
-      cpu: 10m
-      memory: 64Mi
-    limits:
-      cpu: 500m  # Increased slightly for initial sync
-      memory: 512Mi
+  persistence:
+    data:
+      enabled: true
+      storageClass: "longhorn"
+      accessMode: ReadWriteOnce
+      size: 5Gi
+      type: persistentVolumeClaim
+      globalMounts:
+        - path: /data
