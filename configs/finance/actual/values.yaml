@@ -2,7 +2,7 @@
 actualbudget:
   image:
     repository: actualbudget/actual-server
-    tag: "25.1.0"
+    tag: "26.1.0"
     pullPolicy: IfNotPresent
 
   persistence:
