@@ -4,5 +4,5 @@ name: actual-stack
 version: 1.0.0
 dependencies:
   - name: actualbudget
-    version: 0.2.3
+    version: 1.8.5
     repository: https://community-charts.github.io/helm-charts
