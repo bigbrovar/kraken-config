@@ -24,6 +24,11 @@ spec:
           leaderElection:
             namespace: cert-manager
 
+        # Force cert-manager to use Public DNS for validation
+        extraArgs:
+          - --dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53
+          - --dns01-recursive-nameservers-only=true
+
         # DISABLE startup API check (causes ArgoCD conflicts)
         startupapicheck:
           enabled: false
