@@ -1,13 +1,19 @@
----
-apiVersion: bitnami.com/v1alpha1
-kind: SealedSecret
-metadata:
-  name: cloudflare-api-token
-  namespace: cert-manager
-spec:
-  encryptedData:
-    api-token: AgDXAVdu1xKtd8QFRqUFVZ3pkfu2Emj/p9qrr+FxxldlSdZSWBH2y1dl5Ms5U0LmtS62wnq4cRNGvcm+5Pgu1FPZeLG/nLtG0pTSmLtSOkBaEPa91JyyjGazPRKaCxwOmuvPuQNWR1XgDWL10Z4lh4nhDg5r/KdXH+v/zjXEk9x6Y76PggX8PtZffvNg/ztGAVFK+BVbh/PNVFZ/5BSSsXQ4TX7G4Q7uTxvAYX7gow6zAYnCe4ACBROndGHssQkt5Afg0agiMKkoXB/DuQ4ERavD5alR3Cx3BpKzq+8j0AMNz48XYYhaGjSD2QmhK2HcHNa749fppITld1yNjHQEGJQwkFvRoRmZWr1ttP1Wpw1rVrnSkVkOvS7E0G8vLNE/h4cOgwDvsy8bWOiIb20yioeWU4WsQjr4FZcZLgeexAtQWDkMtAU3csUq2pvF0MPEmcnv64fPCzB+DaAQltLhdJJ/sV1WNC7FqAhf+HBy+jXVcMKWssQglSpI/TRo7zbq6Q4MoZVe3L3KW6WDQ0iXYeg1aFqdJXaODqJS1sklykVDtbYSZY0aEcqMnTXfIKGKQiimnIG0l91Qe2wJmlpgRTRy7n6zNGO01lLkCDsQV0Z2wwx3WAH1jglB4dTOYxNsWr5RaeAe7A4DK+0ZF9M4uYmPmbj8ZNUBuo6SWPXUgxQLk8ffZEx/RpNBKayXZKKnMPtUeDcgtmHnrcrkTuO/3a87VqOaqEIrQD3km7eabjcQcx6hfVWYgJAD
-  template:
-    metadata:
-      name: cloudflare-api-token
-      namespace: cert-manager
+{
+  "kind": "SealedSecret",
+  "apiVersion": "bitnami.com/v1alpha1",
+  "metadata": {
+    "name": "cloudflare-api-token",
+    "namespace": "cert-manager"
+  },
+  "spec": {
+    "template": {
+      "metadata": {
+        "name": "cloudflare-api-token",
+        "namespace": "cert-manager"
+      }
+    },
+    "encryptedData": {
+      "api-token": "AgCZHBtRc4OrkO7M64LIxA/LMvEQHEFWfIxEe/nMobT95C93Ep1NPoZnrldpl2RvlCq0NV6QElOk5pvL9oUsf2UMF/5uXaoEjcP4OpwKEe35Cx1Mp4nbhkLZZixyjyXvMVIOawMBoR7qaF20zw7JveEFI+sGtu/VTv6JsQTif/TBr/NMqp7cHQ1mH3NP4AQzERkL04nBMzXzHEfEAJPxgNTbT09LFR3CZoSxcSotTU3u2YKUKRcNgqGrOE750qr4uIVktMiYdmeMwHNCTWOXdwmuHY6L9oQH18s+fe7oGePIJ+DkwBuoOXvreaMQQDUmJAsR7kxLpiuDVqjh2vOlvNam+4bmutIBElL48tyKUAz9vWtYwfTZRV7TBOtCHAH9BCg3DOVvEEhE5UrH3MeT/Os4gZ7euCChjw7SQorBH9FWuU25ApqPBfRomSE/GUfJwgFxGYoG65GBekaUIHqmM508COIUjHYsxDwWeyHe1Gcn1KGPz0+5dt+uA2o92mAfls2b2gvZez+O6JnKApAkdvznghalGo8gTHQPH72LTSEVp4zDphvaympKOgkwxtHqx4NeelhVLBrAq/dfVB+80WRRZjrr8XiXNUvaSXXafuHshw2weN4Vy+uv7yBm3miIi8N03D5ibxaHdDVBeobzJo5F0k/xfG6CfH9EKKRJhS5BAgEJJBcx2h7C8haxmIvGAMCMDMIE+MACNQWj7iSpvODPUyltnzzaRMb5E/v8ppusqu0xe4cnKXqU"
+    }
+  }
+}
