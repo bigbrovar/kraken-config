@@ -18,7 +18,7 @@ spec:
   duration: 2160h
   renewBefore: 720h
 
-  # 👇 THIS IS THE CRITICAL MISSING PART 👇
+  # THIS IS THE CRITICAL MISSING PART
   secretTemplate:
     annotations:
       reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
