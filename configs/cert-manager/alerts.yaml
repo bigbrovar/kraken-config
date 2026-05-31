@@ -1,0 +1,35 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cert-manager-alerts
+  # Make sure this namespace matches where your kube-prometheus-stack is installed!
+  namespace: monitoring
+spec:
+  groups:
+    - name: cert-manager
+      rules:
+        - alert: CertificateExpiryWarning
+          expr: |
+            certmanager_certificate_expiration_timestamp_seconds - time() < 86400 * 21
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Certificate {{ $labels.name }} expires in less than 21 days"
+
+        - alert: CertificateRenewalFailed
+          expr: |
+            certmanager_certificate_ready_status{condition="False"} == 1
+          for: 30m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Certificate {{ $labels.name }} is not ready"
+
+        - alert: CertManagerOrderStuck
+          expr: |
+            certmanager_http_acme_client_request_duration_seconds_count == 0
+          for: 2h
+          labels:
+            severity: warning
