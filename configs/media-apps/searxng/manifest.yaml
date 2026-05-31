@@ -55,6 +55,19 @@ spec:
       labels:
         app: searxng
     spec:
+      enableServiceLinks: false
+      initContainers:
+        - name: copy-settings
+          image: busybox
+          command:
+            - sh
+            - -c
+            - cp /config/settings.yml /etc/searxng/settings.yml && chmod 644 /etc/searxng/settings.yml
+          volumeMounts:
+            - name: settings-configmap
+              mountPath: /config
+            - name: settings-writable
+              mountPath: /etc/searxng
       containers:
         - name: searxng
           image: searxng/searxng:latest
@@ -69,9 +82,8 @@ spec:
             - secretRef:
                 name: searxng-secrets
           volumeMounts:
-            - name: settings
-              mountPath: /etc/searxng/settings.yml
-              subPath: settings.yml
+            - name: settings-writable
+              mountPath: /etc/searxng
           resources:
             limits:
               cpu: 500m
@@ -92,9 +104,11 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 10
       volumes:
-        - name: settings
+        - name: settings-configmap
           configMap:
             name: searxng-settings
+        - name: settings-writable
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

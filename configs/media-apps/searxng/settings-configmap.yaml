@@ -7,55 +7,39 @@ metadata:
 data:
   settings.yml: |
     use_default_settings: true
-
     search:
       safe_search: 0
       autocomplete: "google"
       default_lang: "en"
-
     server:
-      port: 8080
-      bind_address: "0.0.0.0"
       secret_key: ""  # Set from env
-      limiter: true  # Enable with Redis
+      limiter: true
       image_proxy: true
-
     ui:
       default_theme: simple
       theme_args:
         simple_style: dark
-
-    # Redis URL will be set from env SEARXNG_REDIS_URL
     redis:
       url: redis://searxng-redis:6379/0
-
-    # Increase timeouts
     outgoing:
       request_timeout: 10.0
       max_request_timeout: 20.0
-
-    # Disable problematic engines only
     engines:
       - name: yahoo news
         engine: xpath
         disabled: true
-
       - name: brave news
         engine: xpath
         disabled: true
-
       - name: reddit
         engine: json_engine
         disabled: true
-
       - name: lemmy posts
         engine: lemmy
         disabled: true
-
       - name: mastodon users
         engine: mastodon
         disabled: true
-
       - name: yacy images
         engine: yacy
         disabled: true
