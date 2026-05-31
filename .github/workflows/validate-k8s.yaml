@@ -54,7 +54,7 @@ jobs:
 
       # CHECK 3: Security Scan
       - name: Run Trivy config scan
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@57a9dd4a5b02e0ae6bb85b1e36ec2cfb2f16ef81  # v0.35.0
         with:
           scan-type: 'config'
           scan-ref: '.'
