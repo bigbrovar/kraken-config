@@ -5,46 +5,40 @@ name: Validate Kubernetes Manifests
   push:
     branches: [main]
   workflow_dispatch:
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       # CHECK 1: YAML Syntax
       - name: Set up yamllint
         run: pip install yamllint
+
       - name: Run yamllint
         run: yamllint .
+
       # CHECK 2: Kubernetes Schema Validation
       - name: Set up kubeconform
         run: |
-          # Break long line by using a variable
           KUBEFORM_URL="https://github.com/yannh/kubeconform/releases/download"
           KUBEFORM_URL="${KUBEFORM_URL}/v0.6.6/kubeconform-linux-amd64.tar.gz"
-          curl -Lo kubeconform.tar.gz "$KUBEFORM_URL"
+          curl -fsSL "$KUBEFORM_URL" -o kubeconform.tar.gz
           tar xf kubeconform.tar.gz
           sudo mv kubeconform /usr/local/bin/
+
       - name: Run kubeconform with CRD schemas
         run: |
-          # Define schema URLs as variables to keep lines under 120 chars
-          DATREE_SCHEMA="https://raw.githubusercontent.com"
-          DATREE_SCHEMA="${DATREE_SCHEMA}/datreeio/CRDs-catalog/main"
-          DATREE_SCHEMA="${DATREE_SCHEMA}/{{.Group}}"
-          DATREE_SCHEMA="${DATREE_SCHEMA}/{{.ResourceKind}}"
-          DATREE_SCHEMA="${DATREE_SCHEMA}_{{.ResourceAPIVersion}}.json"
+          DATREE_BASE="https://raw.githubusercontent.com/datreeio/CRDs-catalog/main"
+          DATREE_SCHEMA="${DATREE_BASE}/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
 
-          CERTMGR_SCHEMA="https://raw.githubusercontent.com"
-          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}/cert-manager/cert-manager"
-          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}/master/deploy/crds"
-          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}/{{.ResourceKind}}"
-          CERTMGR_SCHEMA="${CERTMGR_SCHEMA}_{{.ResourceAPIVersion}}.json"
+          CERTMGR_BASE="https://raw.githubusercontent.com/cert-manager/cert-manager/master/deploy/crds"
+          CERTMGR_SCHEMA="${CERTMGR_BASE}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
 
-          SEALED_SCHEMA="https://raw.githubusercontent.com"
-          SEALED_SCHEMA="${SEALED_SCHEMA}/bitnami-labs/sealed-secrets"
-          SEALED_SCHEMA="${SEALED_SCHEMA}/main/helm/sealed-secrets/crds"
-          SEALED_SCHEMA="${SEALED_SCHEMA}/{{.ResourceKind}}"
-          SEALED_SCHEMA="${SEALED_SCHEMA}_{{.ResourceAPIVersion}}.json"
+          SEALED_BASE="https://raw.githubusercontent.com/bitnami-labs/sealed-secrets/main/helm/sealed-secrets/crds"
+          SEALED_SCHEMA="${SEALED_BASE}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
 
           kubeconform \
             -strict \
@@ -57,20 +51,12 @@ jobs:
             -ignore-filename-pattern "Chart.yaml" \
             -ignore-filename-pattern "values.yaml" \
             configs/
-      # CHECK 3: Security Scan
-      - name: Set up Trivy
-        run: |
-          # Direct download bypasses the flaky install script and rate limits
-          TRIVY_URL="https://github.com/aquasecurity/trivy/releases/download"
-          TRIVY_URL="${TRIVY_URL}/v0.58.1/trivy_0.58.1_Linux-64bit.tar.gz"
-          curl -Lo trivy.tar.gz "$TRIVY_URL"
-          tar xzf trivy.tar.gz
-          sudo mv trivy /usr/local/bin/
 
-      - name: Run Trivy
-        run: |
-          # Break long command onto new lines
-          trivy config \
-            --exit-code 1 \
-            --severity HIGH,CRITICAL \
-            .
+      # CHECK 3: Security Scan
+      - name: Run Trivy config scan
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          exit-code: '1'
+          severity: 'HIGH,CRITICAL'
