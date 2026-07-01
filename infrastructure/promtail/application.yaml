@@ -26,7 +26,7 @@ spec:
         config:
           # Loki endpoint
           clients:
-            - url: http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push
+            - url: http://loki-stack-gateway.monitoring.svc.cluster.local/loki/api/v1/push
               tenant_id: ""
               external_labels:
                 cluster: kraken
