@@ -76,6 +76,17 @@ spec:
               labels:
                 app: prometheus
 
+            # Machines outside k3s, running node_exporter on :9100
+            additionalScrapeConfigs:
+              - job_name: node-exporter
+                static_configs:
+                  - targets: ['172.42.0.7:9100']
+                    labels: {instance: pve}
+                  - targets: ['172.42.0.13:9100']
+                    labels: {instance: centauri}
+                  - targets: ['172.42.0.4:9100']
+                    labels: {instance: odroid-hc2}
+
         # ============================================
         # GRAFANA
         # ============================================
