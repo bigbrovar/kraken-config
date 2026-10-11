@@ -125,7 +125,8 @@ spec:
               cpu: 500m
               memory: 512Mi
 
-          # DISABLE sidecar to prevent ConfigMap drift
+          # Sidecars load dashboards/datasources from ConfigMaps in this
+          # namespace only (limits drift)
           sidecar:
             dashboards:
               enabled: true
@@ -207,6 +208,21 @@ spec:
                   - bot_token_file: /etc/alertmanager/secrets/alertmanager-telegram/token
                     chat_id: 1303864558  # @bigbrovar private chat with @krakenhomelabot
                     send_resolved: true
+                    parse_mode: HTML
+                    # Short, readable message instead of the default label dump.
+                    # "| html" escapes <, > and & so Telegram's HTML parser
+                    # doesn't reject alerts whose text contains them.
+                    message: |-
+                      {{ if eq .Status "firing" }}<b>FIRING</b>{{ else }}<b>RESOLVED</b>{{ end }}:
+                      {{- " " }}{{ .CommonLabels.alertname | html }}
+                      {{- " " }}({{ .CommonLabels.severity | html }})
+                      {{- range .Alerts }}
+
+                      • {{ .Annotations.summary | html }}
+                      {{- with .Annotations.description }}
+                      {{ . | html }}
+                      {{- end }}
+                      {{- end }}
 
           # Ingress
           ingress:
@@ -265,7 +281,7 @@ spec:
           enabled: false  # K3s embeds this
 
         kubeEtcd:
-          enabled: false  # K3s uses SQLite by default
+          enabled: false  # Embedded etcd metrics need k3s --etcd-expose-metrics first
 
         kubeScheduler:
           enabled: false  # K3s embeds this
