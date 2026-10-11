@@ -141,7 +141,7 @@ spec:
             - name: Loki
               type: loki
               access: proxy
-              url: http://loki-gateway.monitoring.svc.cluster.local
+              url: http://loki-stack-gateway.monitoring.svc.cluster.local
               isDefault: false
               jsonData:
                 maxLines: 1000
@@ -178,6 +178,35 @@ spec:
 
             # Single replica
             replicas: 1
+
+            # Telegram bot token (SealedSecret in configs/sealed-secrets).
+            # Mounted at /etc/alertmanager/secrets/alertmanager-telegram/
+            secrets:
+              - alertmanager-telegram
+
+          # Routing: everything to Telegram, except the always-firing
+          # pipeline heartbeats. Default inhibit_rules from the chart are kept.
+          config:
+            route:
+              receiver: telegram
+              group_by: ['alertname', 'namespace', 'instance']
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 4h
+              routes:
+                - receiver: 'null'
+                  matchers:
+                    - alertname = "Watchdog"
+                - receiver: 'null'
+                  matchers:
+                    - alertname = "InfoInhibitor"
+            receivers:
+              - name: 'null'
+              - name: telegram
+                telegram_configs:
+                  - bot_token_file: /etc/alertmanager/secrets/alertmanager-telegram/token
+                    chat_id: 1303864558  # @bigbrovar private chat with @krakenhomelabot
+                    send_resolved: true
 
           # Ingress
           ingress:
