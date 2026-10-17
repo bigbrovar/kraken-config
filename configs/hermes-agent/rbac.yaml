@@ -1,0 +1,77 @@
+---
+# Hermes agent: read-only identity for cluster monitoring and diagnosis.
+# Can get/list/watch; cannot read Secrets, exec into pods, or change anything.
+# Changes to the cluster go through pull requests to this repo, never via this account.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hermes-reader
+  namespace: hermes-agent
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+automountServiceAccountToken: false
+
+---
+# Long-lived token for hermes-reader. No secret data in Git: the cluster fills it in.
+# Revoke access: delete this Secret; ArgoCD recreates it with a new token.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hermes-reader-token
+  namespace: hermes-agent
+  annotations:
+    kubernetes.io/service-account.name: hermes-reader
+    argocd.argoproj.io/sync-wave: "0"
+type: kubernetes.io/service-account-token
+
+---
+# Built-in read-only role for namespaced resources (excludes Secrets and exec)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hermes-reader-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    name: hermes-reader
+    namespace: hermes-agent
+
+---
+# Read-only access to cluster-scoped and CRD resources that `view` doesn't cover
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hermes-reader-extra
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications", "applicationsets", "appprojects"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["longhorn.io"]
+    resources: ["volumes", "replicas", "nodes", "engines"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hermes-reader-extra
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hermes-reader-extra
+subjects:
+  - kind: ServiceAccount
+    name: hermes-reader
+    namespace: hermes-agent

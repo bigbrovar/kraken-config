@@ -1,0 +1,34 @@
+---
+# Application: hermes-agent-rbac
+# Purpose: Read-only ServiceAccount for the Hermes AI agent (runs on centauri, outside the cluster)
+# Sync Wave: 45 (last in infrastructure; nothing depends on it)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hermes-agent-rbac
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "45"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    path: configs/hermes-agent
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: hermes-agent
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        maxDuration: 3m
