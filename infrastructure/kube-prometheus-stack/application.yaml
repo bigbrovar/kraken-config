@@ -86,6 +86,8 @@ spec:
                     labels: {instance: centauri}
                   - targets: ['172.42.0.4:9100']
                     labels: {instance: odroid-hc2}
+                  - targets: ['172.42.0.27:9100']
+                    labels: {instance: pve2}
 
         # ============================================
         # GRAFANA
