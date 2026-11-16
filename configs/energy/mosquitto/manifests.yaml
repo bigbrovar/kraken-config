@@ -11,6 +11,7 @@ data:
     # Persistence
     persistence true
     persistence_location /mosquitto/data/
+    persistent_client_expiration 7d
     log_dest stdout
 
     # Authentication
@@ -27,22 +28,6 @@ data:
     # Listener 2: MQTT (Insecure/Local) - Port 1883
     listener 1883
     protocol mqtt
-
-    # -----------------------------------------------------------------
-    # MQTT Bridging Configuration
-    # -----------------------------------------------------------------
-    connection openculture-bridge
-    address ${REMOTE_ADDRESS}
-
-    # Topic mapping: Forward 'helio/#' locally to 'helio/#' remotely
-    topic helio/# out 1
-
-    # Remote Authentication (Injected)
-    remote_username ${REMOTE_USERNAME}
-    remote_password ${REMOTE_PASSWORD}
-
-    # Bridge TLS settings (Required for port 8883)
-    bridge_capath /etc/ssl/certs
 
 ---
 # 2. PVC: Persistent Data
