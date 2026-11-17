@@ -23,7 +23,9 @@ spec:
         runAsUser: 65532
       containers:
         - name: cloudflared
-          image: cloudflare/cloudflared:latest
+          # A fixed version, so a restart never pulls in a release nobody has looked at.
+          # To update: pick a version from the cloudflared releases page and change it here.
+          image: cloudflare/cloudflared:2026.11.0
           args: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "run"]
           env:
             - name: TUNNEL_TOKEN
