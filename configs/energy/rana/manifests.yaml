@@ -3,8 +3,10 @@
 # Secrets come from the SealedSecret "rana-secrets" in configs/sealed-secrets/
 # (keys: influx-token, tunnel-token). See deploy/README.md in the rana repo.
 #
-# There is no Ingress on purpose. The only way in from the internet is the
-# Cloudflare Tunnel, which points at the Service below.
+# Two ways in:
+#   rana.homelab.org.ng      home network only, through the Ingress at the bottom
+#   rana.openculture.org.ng  the internet, through the Cloudflare Tunnel, which points
+#                            at the Service and is subject to the limits and human check
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -45,6 +47,20 @@ spec:
                 secretKeyRef:
                   name: rana-secrets
                   key: influx-token
+            # Human check (Cloudflare Turnstile) in front of zoom and Stats for geeks.
+            # The site key is public. Leave it empty to switch the check off.
+            - name: TURNSTILE_SITE_KEY
+              value: ""
+            # The home address below is served by the cluster's own ingress and is
+            # treated as trusted: no human check and no per-visitor limits.
+            - name: TRUSTED_HOSTS
+              value: rana.homelab.org.ng
+            - name: TURNSTILE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: rana-secrets
+                  key: turnstile-secret
+                  optional: true
           readinessProbe:
             httpGet:
               path: /healthz
@@ -83,3 +99,35 @@ spec:
     - name: http
       port: 80
       targetPort: http
+---
+# Home network only. pfSense resolves this name to the cluster's ingress.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rana
+  namespace: energy
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Live updates are one long-running connection. Do not buffer it or cut it short.
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    # DOUBLE-LOCK: Stop cert-manager from overwriting the secret
+    cert-manager.io/issuer: "null"
+    cert-manager.io/cluster-issuer: "null"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - rana.homelab.org.ng
+      secretName: wildcard-homelab-tls
+  rules:
+    - host: rana.homelab.org.ng
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rana
+                port:
+                  name: http
