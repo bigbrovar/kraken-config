@@ -50,7 +50,7 @@ spec:
             # Human check (Cloudflare Turnstile) in front of zoom and Stats for geeks.
             # The site key is public. Leave it empty to switch the check off.
             - name: TURNSTILE_SITE_KEY
-              value: ""
+              value: "0x4AAAAAAGFA4up-W1l8uUIP"
             # The home address below is served by the cluster's own ingress and is
             # treated as trusted: no human check and no per-visitor limits.
             - name: TRUSTED_HOSTS
