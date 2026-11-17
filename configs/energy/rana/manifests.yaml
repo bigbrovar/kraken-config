@@ -1,0 +1,85 @@
+# Rana: read-only solar dashboard.
+#
+# Secrets come from the SealedSecret "rana-secrets" in configs/sealed-secrets/
+# (keys: influx-token, tunnel-token). See deploy/README.md in the rana repo.
+#
+# There is no Ingress on purpose. The only way in from the internet is the
+# Cloudflare Tunnel, which points at the Service below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rana
+  namespace: energy
+  labels:
+    app: rana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rana
+  template:
+    metadata:
+      labels:
+        app: rana
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: rana
+          image: ghcr.io/bigbrovar/rana:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # Talk to InfluxDB inside the cluster instead of going out through the public name.
+            - name: INFLUX_URL
+              value: http://influxdb.energy.svc.cluster.local:8086
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: rana-secrets
+                  key: influx-token
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rana
+  namespace: energy
+  labels:
+    app: rana
+spec:
+  type: ClusterIP
+  selector:
+    app: rana
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
