@@ -1,0 +1,154 @@
+# InfluxDB housekeeping: a second bucket that keeps a 5-minute summary of every
+# topic for the long term, and the task that fills it.
+#
+# The Job below runs after each sync of the influxdb app. It is safe to re-run:
+# it creates the bucket and the task only if they are missing, and updates the
+# task if its script changed. It never deletes anything.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-rollup
+  namespace: energy
+data:
+  # Every 5 minutes, summarise the last 20 minutes of raw readings. The overlap
+  # means a missed run or two (a restart, say) heals itself, and writing the same
+  # summary twice simply replaces it.
+  #
+  # Each topic gets four numbers per 5 minutes, stored as four fields:
+  #   mean  the average      (right for power)
+  #   min   the lowest       (keeps dips visible)
+  #   max   the highest      (keeps spikes visible)
+  #   last  the final value  (right for counters such as kWh today)
+  #
+  # Only the topic is kept as a tag, so a topic that was once recorded under a
+  # different host name becomes one continuous history.
+  task.flux: |
+    import "date"
+
+    option task = {name: "solar-5m-rollup", every: 5m, offset: 1m}
+
+    stop = date.truncate(t: now(), unit: 5m)
+    start = date.sub(d: 20m, from: stop)
+
+    raw = () =>
+        from(bucket: "solar")
+            |> range(start: start, stop: stop)
+            |> filter(fn: (r) => r._measurement == "mqtt_consumer" and r._field == "value")
+
+    raw()
+        |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)
+        |> keep(columns: ["_time", "_value", "topic"])
+        |> set(key: "_measurement", value: "mqtt_consumer")
+        |> set(key: "_field", value: "mean")
+        |> to(bucket: "solar_5m", org: "homelab")
+        |> yield(name: "mean")
+
+    raw()
+        |> aggregateWindow(every: 5m, fn: min, createEmpty: false)
+        |> keep(columns: ["_time", "_value", "topic"])
+        |> set(key: "_measurement", value: "mqtt_consumer")
+        |> set(key: "_field", value: "min")
+        |> to(bucket: "solar_5m", org: "homelab")
+        |> yield(name: "min")
+
+    raw()
+        |> aggregateWindow(every: 5m, fn: max, createEmpty: false)
+        |> keep(columns: ["_time", "_value", "topic"])
+        |> set(key: "_measurement", value: "mqtt_consumer")
+        |> set(key: "_field", value: "max")
+        |> to(bucket: "solar_5m", org: "homelab")
+        |> yield(name: "max")
+
+    raw()
+        |> aggregateWindow(every: 5m, fn: last, createEmpty: false)
+        |> keep(columns: ["_time", "_value", "topic"])
+        |> set(key: "_measurement", value: "mqtt_consumer")
+        |> set(key: "_field", value: "last")
+        |> to(bucket: "solar_5m", org: "homelab")
+        |> yield(name: "last")
+
+  setup.sh: |
+    #!/bin/sh
+    set -eu
+    echo "Waiting for InfluxDB at $INFLUX_HOST"
+    until influx ping >/dev/null 2>&1; do sleep 5; done
+
+    if influx bucket list --hide-headers | awk '{print $2}' | grep -qx "$ROLLUP_BUCKET"; then
+      echo "Bucket $ROLLUP_BUCKET already exists"
+    else
+      echo "Creating bucket $ROLLUP_BUCKET (kept forever)"
+      influx bucket create --name "$ROLLUP_BUCKET" --retention 0 \
+        --description "5-minute summaries of the solar bucket"
+    fi
+
+    TASK_ID=$(influx task list --hide-headers | awk '$2 == "solar-5m-rollup" {print $1}')
+    if [ -z "$TASK_ID" ]; then
+      echo "Creating task solar-5m-rollup"
+      influx task create --file /rollup/task.flux
+    else
+      echo "Updating task solar-5m-rollup ($TASK_ID)"
+      influx task update --id "$TASK_ID" --file /rollup/task.flux
+    fi
+    echo "Done"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: influxdb-rollup-setup
+  namespace: energy
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: setup
+          image: influxdb:2.7
+          command: ["/bin/sh", "/rollup/setup.sh"]
+          env:
+            - name: HOME
+              value: /tmp
+            - name: INFLUX_HOST
+              value: http://influxdb.energy.svc.cluster.local:8086
+            - name: INFLUX_ORG
+              value: homelab
+            - name: ROLLUP_BUCKET
+              value: solar_5m
+            - name: INFLUX_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: influxdb-auth
+                  key: admin-token
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: rollup
+              mountPath: /rollup
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: rollup
+          configMap:
+            name: influxdb-rollup
+        - name: tmp
+          emptyDir: {}
