@@ -31,24 +31,29 @@ spec:
       labels:
         app: jellyseerr
     spec:
+      # Seerr runs as the non-root node user (1000); fsGroup keeps the
+      # existing Longhorn volume writable after the move from Jellyseerr.
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: jellyseerr
-          # CHANGED IMAGE TO JELLYSEERR
-          image: fallenbagel/jellyseerr:latest
+          # Jellyseerr merged into Seerr; resource names are kept so the
+          # existing PVC and hostname carry over.
+          image: ghcr.io/seerr-team/seerr:v3.5.2
           securityContext:
             allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
             capabilities:
               drop:
                 - ALL
-              add:
-                - CHOWN
-                - SETGID
-                - SETUID
+            seccompProfile:
+              type: RuntimeDefault
           env:
-            - name: PUID
-              value: "1000"
-            - name: PGID
-              value: "1000"
             - name: TZ
               value: "Africa/Lagos"
           ports:
