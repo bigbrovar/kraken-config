@@ -159,14 +159,12 @@ metadata:
   labels:
     app: kavita
   annotations:
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-security-headers@kubernetescrd
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   tls:
     - hosts:
         - books.homelab.org.ng

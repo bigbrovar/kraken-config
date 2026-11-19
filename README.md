@@ -33,7 +33,7 @@ The platform is built in two distinct layers:
 ### 2. Kubernetes Platform (GitOps)
 
 * **GitOps Controller:** ArgoCD (App-of-Apps pattern)
-* **Ingress Controller:** ingress-nginx (with MetalLB for LoadBalancing)
+* **Ingress Controller:** Traefik (with MetalLB for LoadBalancing)
 * **Persistent Storage:** Longhorn (Distributed Block Storage on NVMe) & NFS (TrueNAS integration)
 * **SSL/TLS Automation:** cert-manager (Let's Encrypt DNS-01 via Cloudflare)
 * **Secret Management:** Sealed Secrets (Encryption at rest in Git)

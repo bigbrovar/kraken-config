@@ -5,14 +5,13 @@ metadata:
   name: longhorn-ingress
   namespace: longhorn-system
   annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-security-headers@kubernetescrd
     # Increase body size for large volume backups/restores via UI
-    nginx.ingress.kubernetes.io/proxy-body-size: 10000m
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   tls:
     - hosts:
         - longhorn.homelab.org.ng

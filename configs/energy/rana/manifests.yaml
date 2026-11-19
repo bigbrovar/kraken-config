@@ -107,15 +107,14 @@ metadata:
   name: rana
   namespace: energy
   annotations:
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-security-headers@kubernetescrd
     # Live updates are one long-running connection. Do not buffer it or cut it short.
-    nginx.ingress.kubernetes.io/proxy-buffering: "off"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     # DOUBLE-LOCK: Stop cert-manager from overwriting the secret
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   tls:
     - hosts:
         - rana.homelab.org.ng

@@ -128,14 +128,12 @@ metadata:
   name: searxng
   namespace: media
   annotations:
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-security-headers@kubernetescrd,media-rate-limit-10rps@kubernetescrd
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
-    nginx.ingress.kubernetes.io/limit-rps: "10"
-    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   tls:
     - secretName: wildcard-homelab-tls
       hosts:
@@ -151,3 +149,15 @@ spec:
                 name: searxng
                 port:
                   number: 8080
+---
+# 10 requests/second per client, as the old nginx limit-rps annotation did.
+# Referenced by the Ingress as media-rate-limit-10rps@kubernetescrd.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit-10rps
+  namespace: media
+spec:
+  rateLimit:
+    average: 10
+    burst: 20
