@@ -1,8 +1,7 @@
 ---
-# Traefik runs NEXT TO ingress-nginx while apps are migrated one at a time.
-# ingress-nginx keeps 172.42.1.10 and stays the default IngressClass.
-# Traefik gets its own MetalLB address and only serves Ingresses that ask
-# for it with `ingressClassName: traefik`.
+# Traefik is the cluster's ingress controller. It replaced ingress-nginx,
+# which was retired upstream in March 2026, and holds the address all
+# *.homelab.org.ng names resolve to.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -25,7 +24,7 @@ spec:
 
         ingressClass:
           enabled: true
-          isDefaultClass: false  # nginx stays default until cutover
+          isDefaultClass: true
           name: traefik
 
         providers:
@@ -53,8 +52,9 @@ spec:
           # LoadBalancer is the chart default. Chart 42.x rejects an explicit
           # `type` key here.
           annotations:
-            # Pinned so pfSense DNS can point at a stable address
-            metallb.universe.tf/loadBalancerIPs: 172.42.1.11
+            # The address pfSense resolves *.homelab.org.ng to. Pinned so it
+            # can never drift.
+            metallb.universe.tf/loadBalancerIPs: 172.42.1.10
           spec:
             externalTrafficPolicy: Local
 
