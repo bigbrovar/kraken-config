@@ -1,0 +1,33 @@
+---
+# TEMPORARY. Traefik copies of the nginx Ingresses for pre-cutover testing.
+# Delete this app and configs/traefik-migration/ when ingress-nginx is removed.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik-migration
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "55"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bigbrovar/kraken-config.git'
+    targetRevision: HEAD
+    path: configs/traefik-migration
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: traefik
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        maxDuration: 3m
