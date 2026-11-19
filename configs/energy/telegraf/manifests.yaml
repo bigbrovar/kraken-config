@@ -56,6 +56,9 @@ spec:
   # disconnecting each other during a rolling update.
   strategy:
     type: Recreate
+    # Needed when switching an existing Deployment from RollingUpdate:
+    # the API rejects Recreate while the old rollingUpdate settings remain.
+    rollingUpdate: null
   selector:
     matchLabels:
       app: telegraf

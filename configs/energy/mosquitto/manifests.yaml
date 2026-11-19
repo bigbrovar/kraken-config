@@ -60,6 +60,9 @@ spec:
   # one starts, or a rollout can hang waiting for the volume.
   strategy:
     type: Recreate
+    # Needed when switching an existing Deployment from RollingUpdate:
+    # the API rejects Recreate while the old rollingUpdate settings remain.
+    rollingUpdate: null
   selector:
     matchLabels:
       app: mosquitto
