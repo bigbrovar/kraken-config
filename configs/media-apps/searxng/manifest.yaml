@@ -151,3 +151,30 @@ spec:
                 name: searxng
                 port:
                   number: 8080
+---
+# Migration test: the same host served by Traefik on 172.42.1.11.
+# DNS still points search.homelab.org.ng at ingress-nginx (172.42.1.10),
+# so nothing changes for users until DNS is moved. Test with:
+#   curl -sI --resolve search.homelab.org.ng:443:172.42.1.11 https://search.homelab.org.ng
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: searxng-traefik
+  namespace: media
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: wildcard-homelab-tls
+      hosts:
+        - search.homelab.org.ng
+  rules:
+    - host: search.homelab.org.ng
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: searxng
+                port:
+                  number: 8080
