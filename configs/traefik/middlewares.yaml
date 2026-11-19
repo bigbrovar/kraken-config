@@ -1,0 +1,13 @@
+---
+# Shared by every Ingress through the annotation
+#   traefik.ingress.kubernetes.io/router.middlewares: traefik-security-headers@kubernetescrd
+# Sends Strict-Transport-Security, as ingress-nginx did by default.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+  namespace: traefik
+spec:
+  headers:
+    stsSeconds: 31536000
+    stsIncludeSubdomains: true

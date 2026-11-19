@@ -114,12 +114,13 @@ metadata:
   name: jellyseerr
   namespace: media
   annotations:
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-security-headers@kubernetescrd
     # Double-lock against cert-manager
     cert-manager.io/issuer: "null"
     cert-manager.io/cluster-issuer: "null"
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   tls:
     - hosts:
         # CHANGED HOSTNAME

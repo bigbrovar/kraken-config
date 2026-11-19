@@ -116,8 +116,10 @@ spec:
           # Ingress with TLS
           ingress:
             enabled: true
-            ingressClassName: nginx
+            ingressClassName: traefik
             annotations:
+              traefik.ingress.kubernetes.io/router.entrypoints: websecure
+              traefik.ingress.kubernetes.io/router.middlewares: traefik-security-headers@kubernetescrd
               cert-manager.io/issuer: "null"
               cert-manager.io/cluster-issuer: "null"
             hosts:
@@ -240,8 +242,10 @@ spec:
           # Ingress
           ingress:
             enabled: true
-            ingressClassName: nginx
+            ingressClassName: traefik
             annotations:
+              traefik.ingress.kubernetes.io/router.entrypoints: websecure
+              traefik.ingress.kubernetes.io/router.middlewares: traefik-security-headers@kubernetescrd
               cert-manager.io/issuer: "null"
               cert-manager.io/cluster-issuer: "null"
             hosts:
