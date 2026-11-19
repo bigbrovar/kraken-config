@@ -1,0 +1,48 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Africa/Lagos",
+  "schedule": ["every weekend"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "minimumReleaseAge": "3 days",
+  "ignorePaths": ["configs/sealed-secrets/**"],
+  "argocd": {
+    "managerFilePatterns": [
+      "/^(infrastructure|platform)/.+/application\\.yaml$/",
+      "/^bootstrap/.+\\.yaml$/"
+    ]
+  },
+  "kubernetes": {
+    "managerFilePatterns": ["/^configs/.+\\.ya?ml$/"]
+  },
+  "packageRules": [
+    {
+      "description": "Major upgrades are not opened automatically. Tick the box in the Dependency Dashboard issue to request one.",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Longhorn holds app data and must be upgraded one minor version at a time, with backups first. After each step, raise allowedVersions by one minor.",
+      "matchPackageNames": ["longhorn"],
+      "allowedVersions": "<1.9.0",
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Images on a floating tag (latest) are pinned to a digest so a pod restart cannot silently change the version. Refreshed together once a month.",
+      "matchDatasources": ["docker"],
+      "matchCurrentValue": "/^latest/",
+      "pinDigests": true,
+      "groupName": "floating image tags",
+      "schedule": ["on the first day of the month"]
+    },
+    {
+      "description": "Rana is built and released by its own pipeline.",
+      "matchPackageNames": ["ghcr.io/bigbrovar/rana"],
+      "enabled": false
+    }
+  ]
+}
