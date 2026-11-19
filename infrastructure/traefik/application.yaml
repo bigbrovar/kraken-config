@@ -62,6 +62,11 @@ spec:
           dashboard:
             enabled: false
 
+        additionalArguments:
+          # Traefik stops reading a request after 60s by default, which would
+          # cut large uploads (Longhorn backing images, Kavita books).
+          - --entryPoints.websecure.transport.respondingTimeouts.readTimeout=3600s
+
         resources:
           requests:
             cpu: 100m
