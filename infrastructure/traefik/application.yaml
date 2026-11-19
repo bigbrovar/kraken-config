@@ -1,0 +1,105 @@
+---
+# Traefik runs NEXT TO ingress-nginx while apps are migrated one at a time.
+# ingress-nginx keeps 172.42.1.10 and stays the default IngressClass.
+# Traefik gets its own MetalLB address and only serves Ingresses that ask
+# for it with `ingressClassName: traefik`.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://traefik.github.io/charts
+    chart: traefik
+    targetRevision: 42.4.1
+    helm:
+      valuesObject:
+        deployment:
+          replicas: 2
+
+        ingressClass:
+          enabled: true
+          isDefaultClass: false  # nginx stays default until cutover
+          name: traefik
+
+        providers:
+          kubernetesIngress:
+            enabled: true
+            # Write Traefik's LoadBalancer IP into each Ingress status
+            publishedService:
+              enabled: true
+          kubernetesCRD:
+            enabled: true  # Middleware / IngressRouteTCP, needed later for ArgoCD
+          kubernetesGateway:
+            enabled: false
+
+        ports:
+          web:
+            # Replaces the nginx force-ssl-redirect annotation for every host
+            http:
+              redirections:
+                entryPoint:
+                  to: websecure
+                  scheme: https
+                  permanent: true
+
+        service:
+          type: LoadBalancer
+          annotations:
+            # Pinned so pfSense DNS can point at a stable address
+            metallb.universe.tf/loadBalancerIPs: 172.42.1.11
+          spec:
+            externalTrafficPolicy: Local
+
+        ingressRoute:
+          dashboard:
+            enabled: false
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchExpressions:
+                      - key: app.kubernetes.io/name
+                        operator: In
+                        values:
+                          - traefik
+                  topologyKey: kubernetes.io/hostname
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: traefik
+  ignoreDifferences:
+    - group: ""
+      kind: Service
+      name: traefik
+      jsonPointers:
+        - /status/loadBalancer
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 5m
