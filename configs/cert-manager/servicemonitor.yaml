@@ -1,0 +1,22 @@
+---
+# Tells Prometheus to collect cert-manager's metrics. Without this the
+# alerts in alerts.yaml (certificate expiry, renewal failed) have no data
+# and can never fire.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+spec:
+  namespaceSelector:
+    matchNames:
+      - cert-manager
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+      app.kubernetes.io/instance: cert-manager
+      app.kubernetes.io/component: controller
+  endpoints:
+    - port: http-metrics
+      path: /metrics
+      interval: 60s

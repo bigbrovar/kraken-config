@@ -54,15 +54,17 @@ metadata:
   namespace: energy
   labels:
     app: mosquitto
+  annotations:
+    # Mosquitto loads its TLS certificate once, at startup. Reloader restarts
+    # it when cert-manager renews the certificate (every 60 days), so the
+    # 8883 listener never serves an expired one.
+    secret.reloader.stakater.com/reload: "wildcard-homelab-tls"
 spec:
   replicas: 1
   # The data volume is ReadWriteOnce: the old pod must stop before the new
   # one starts, or a rollout can hang waiting for the volume.
   strategy:
     type: Recreate
-    # Needed when switching an existing Deployment from RollingUpdate:
-    # the API rejects Recreate while the old rollingUpdate settings remain.
-    rollingUpdate: null
   selector:
     matchLabels:
       app: mosquitto

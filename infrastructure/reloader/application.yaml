@@ -1,0 +1,43 @@
+---
+# Reloader restarts a workload when a Secret or ConfigMap it names changes.
+# Used for Mosquitto, which reads its TLS certificate only at startup and
+# would otherwise keep serving the old one after cert-manager renews it.
+#
+# Opt-in per workload with an annotation, for example:
+#   secret.reloader.stakater.com/reload: "wildcard-homelab-tls"
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: reloader
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "36"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://stakater.github.io/stakater-charts
+    chart: reloader
+    targetRevision: 2.2.20
+    helm:
+      valuesObject:
+        reloader:
+          # Marks a restart with a pod annotation instead of an injected
+          # environment variable, so ArgoCD does not see it as drift.
+          reloadStrategy: annotations
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: reloader
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 3m
