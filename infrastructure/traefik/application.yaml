@@ -50,7 +50,8 @@ spec:
                   permanent: true
 
         service:
-          type: LoadBalancer
+          # LoadBalancer is the chart default. Chart 42.x rejects an explicit
+          # `type` key here.
           annotations:
             # Pinned so pfSense DNS can point at a stable address
             metallb.universe.tf/loadBalancerIPs: 172.42.1.11
