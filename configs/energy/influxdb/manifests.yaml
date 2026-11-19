@@ -99,6 +99,16 @@ spec:
                   name: influxdb-auth
                   key: admin-token
 
+          # Usage observed at about 1.8Gi (2026-11). The request is kept
+          # below that so the pod can always be scheduled; the limit stops
+          # a runaway query from starving the node.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1Gi
+            limits:
+              memory: 4Gi
+
           # Storage & Config Mounts
           volumeMounts:
             - name: data

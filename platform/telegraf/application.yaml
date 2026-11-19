@@ -5,7 +5,7 @@ metadata:
   name: telegraf
   namespace: argocd
   finalizers:
-    - resources-finalizer.argoproj.io
+    - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/sync-wave: "52" # Deploy after InfluxDB
 spec:

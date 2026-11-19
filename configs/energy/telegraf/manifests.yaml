@@ -52,6 +52,10 @@ metadata:
     app: telegraf
 spec:
   replicas: 1
+  # One MQTT consumer at a time: two pods with the same client would keep
+  # disconnecting each other during a rolling update.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: telegraf
@@ -81,12 +85,14 @@ spec:
                   name: telegraf-secrets
                   key: mqtt-password
 
+          # Usage observed at about 170Mi (2026-11); headroom for the
+          # buffer that fills while InfluxDB is restarting.
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "100m"
+              memory: "192Mi"
+              cpu: "50m"
             limits:
-              memory: "256Mi"
+              memory: "512Mi"
               cpu: "500m"
 
           volumeMounts:
@@ -95,14 +101,9 @@ spec:
               subPath: telegraf.conf
               readOnly: true
 
-          livenessProbe:
-            exec:
-              command:
-                - telegraf
-                - --test
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 10
+          # No liveness probe on purpose. The previous one ran `telegraf --test`
+          # every 30s, which starts a second Telegraf and never checks the
+          # running one. If Telegraf exits, Kubernetes restarts it anyway.
 
       volumes:
         - name: config

@@ -150,9 +150,10 @@ spec:
               mountPath: /var/cache
 
           resources:
+            # Scans once a day; idle the rest of the time
             requests:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 50m
+              memory: 128Mi
             limits:
               cpu: 2000m
               memory: 2Gi
