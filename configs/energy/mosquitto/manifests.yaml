@@ -1,13 +1,14 @@
 ---
-# 1. ConfigMap: Mosquitto Configuration TEMPLATE
-# We use a template so we can inject secrets (remote user/pass) at runtime
+# 1. ConfigMap: Mosquitto configuration, mounted as-is.
+# Credentials are not in here: users come from the password file in the
+# mosquitto-auth secret.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mosquitto-config
   namespace: energy
 data:
-  mosquitto.conf.template: |
+  mosquitto.conf: |
     # Persistence
     persistence true
     persistence_location /mosquitto/data/
@@ -55,6 +56,10 @@ metadata:
     app: mosquitto
 spec:
   replicas: 1
+  # The data volume is ReadWriteOnce: the old pod must stop before the new
+  # one starts, or a rollout can hang waiting for the volume.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: mosquitto
@@ -66,39 +71,6 @@ spec:
       securityContext:
         fsGroup: 1883
 
-      # Init Container: Reads template + secrets -> writes final config
-      initContainers:
-        - name: config-generator
-          image: alpine:latest
-          command: ["/bin/sh", "-c"]
-          args:
-            - |
-              sed -e "s|\${REMOTE_ADDRESS}|$REMOTE_ADDRESS|g" \
-                  -e "s|\${REMOTE_USERNAME}|$REMOTE_USERNAME|g" \
-                  -e "s|\${REMOTE_PASSWORD}|$REMOTE_PASSWORD|g" \
-                  /config-template/mosquitto.conf.template > /config-generated/mosquitto.conf
-          env:
-            - name: REMOTE_ADDRESS
-              valueFrom:
-                secretKeyRef:
-                  name: mosquitto-auth
-                  key: remote_address
-            - name: REMOTE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: mosquitto-auth
-                  key: remote_username
-            - name: REMOTE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mosquitto-auth
-                  key: remote_password
-          volumeMounts:
-            - name: config-template
-              mountPath: /config-template
-            - name: config-generated
-              mountPath: /config-generated
-
       containers:
         - name: mosquitto
           image: eclipse-mosquitto:2.0
@@ -107,9 +79,32 @@ spec:
               name: mqtts
             - containerPort: 1883
               name: mqtt
+          # Usage observed at about 550Mi (2026-11). The limit protects the
+          # node if the broker's message queue grows without bound.
+          resources:
+            requests:
+              cpu: 20m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          startupProbe:
+            tcpSocket:
+              port: mqtt
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            tcpSocket:
+              port: mqtt
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: mqtt
+            periodSeconds: 20
+            failureThreshold: 3
           volumeMounts:
-            # Mount the GENERATED config from the shared volume
-            - name: config-generated
+            # The config has no secrets or variables in it, so it is mounted
+            # straight from the ConfigMap.
+            - name: config
               mountPath: /mosquitto/config/mosquitto.conf
               subPath: mosquitto.conf
             - name: data
@@ -121,12 +116,9 @@ spec:
               mountPath: /mosquitto/auth
               readOnly: true
       volumes:
-        - name: config-template
+        - name: config
           configMap:
             name: mosquitto-config
-        # EmptyDir to share generated config between Init and Main container
-        - name: config-generated
-          emptyDir: {}
         - name: data
           persistentVolumeClaim:
             claimName: mosquitto-data

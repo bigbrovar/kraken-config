@@ -10,7 +10,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "21"
   finalizers:
-    - resources-finalizer.argoproj.io
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:

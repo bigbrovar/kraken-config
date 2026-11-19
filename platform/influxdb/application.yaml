@@ -5,7 +5,7 @@ metadata:
   name: influxdb
   namespace: argocd
   finalizers:
-    - resources-finalizer.argoproj.io
+    - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/sync-wave: "51" # Deploy after Mosquitto
 spec:

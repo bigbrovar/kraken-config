@@ -26,10 +26,3 @@ spec:
             severity: critical
           annotations:
             summary: "Certificate {{ $labels.name }} is not ready"
-
-        - alert: CertManagerOrderStuck
-          expr: |
-            certmanager_http_acme_client_request_duration_seconds_count == 0
-          for: 2h
-          labels:
-            severity: warning
