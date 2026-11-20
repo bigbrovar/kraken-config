@@ -1,0 +1,44 @@
+---
+# Scheduled Longhorn backups to the NAS.
+#
+# Both jobs are in the "default" group, which Longhorn applies to every
+# volume that has no schedule of its own. New volumes are covered
+# automatically.
+#
+# Cron times are UTC. Lagos is UTC+1.
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: backup-nightly
+  namespace: longhorn-system
+spec:
+  name: backup-nightly
+  task: backup
+  # 02:00 Lagos time, every night
+  cron: "0 1 * * *"
+  # Keep the last 7 nightly backups of each volume
+  retain: 7
+  # Volumes backed up at the same time
+  concurrency: 2
+  groups:
+    - default
+  labels:
+    schedule: nightly
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: backup-weekly
+  namespace: longhorn-system
+spec:
+  name: backup-weekly
+  task: backup
+  # 05:00 Lagos time, every Sunday
+  cron: "0 4 * * 0"
+  # Keep the last 4 weekly backups of each volume
+  retain: 4
+  concurrency: 2
+  groups:
+    - default
+  labels:
+    schedule: weekly

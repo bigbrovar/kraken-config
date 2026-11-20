@@ -29,6 +29,9 @@ spec:
           createDefaultDiskLabeledNodes: true
           defaultLonghornStaticStorageClass: longhorn
           taintToleration: ""
+          # Backups go to an NFS share on the NAS. Schedules are in
+          # configs/longhorn-backup.
+          backupTarget: nfs://172.42.0.2:/mnt/Dune/longhorn-backup
         # Required for ArgoCD
         preUpgradeChecker:
           jobEnabled: false
