@@ -1,9 +1,28 @@
 ---
 # Scheduled Longhorn backups to the NAS.
 #
-# Both jobs are in the "default" group, which Longhorn applies to every
-# volume that has no schedule of its own. New volumes are covered
-# automatically.
+# Groups:
+#   default           Backups plus maintenance. Longhorn applies this group to
+#                     every volume that has no group label of its own, so new
+#                     volumes are covered automatically.
+#   maintenance-only  Maintenance, no backups. For large volumes whose data is
+#                     replaceable (Prometheus metrics, Loki logs). Keeping a
+#                     backup snapshot behind a volume that rewrites itself all
+#                     day makes it use about twice its size on disk.
+#
+# A volume joins maintenance-only through a label on its Longhorn volume.
+# That label is not stored in git. To see which volumes have it:
+#
+#   kubectl -n longhorn-system get volumes.longhorn.io \
+#     -l recurring-job-group.longhorn.io/maintenance-only=enabled
+#
+# To add one (use the pvc-... name from `get volumes.longhorn.io`):
+#
+#   kubectl -n longhorn-system label volumes.longhorn.io <volume> \
+#     recurring-job-group.longhorn.io/maintenance-only=enabled
+#
+# To put it back in the default group, remove the label (same command with
+# a trailing minus: ...maintenance-only-).
 #
 # Cron times are UTC. Lagos is UTC+1.
 apiVersion: longhorn.io/v1beta2
@@ -40,5 +59,48 @@ spec:
   concurrency: 2
   groups:
     - default
+  labels:
+    schedule: weekly
+---
+# Removes snapshots Longhorn made for its own use (for example while
+# rebuilding a replica) that are no longer needed. Without this, one can
+# sit behind a volume for months and double its disk usage.
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: snapshot-cleanup-weekly
+  namespace: longhorn-system
+spec:
+  name: snapshot-cleanup-weekly
+  task: snapshot-cleanup
+  # 07:00 Lagos time, every Sunday, after the weekly backup
+  cron: "0 6 * * 0"
+  # Not used by this task
+  retain: 0
+  concurrency: 2
+  groups:
+    - default
+    - maintenance-only
+  labels:
+    schedule: weekly
+---
+# Hands space that applications have freed inside a volume back to
+# Longhorn, so deleted data stops counting against the disks.
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: filesystem-trim-weekly
+  namespace: longhorn-system
+spec:
+  name: filesystem-trim-weekly
+  task: filesystem-trim
+  # 08:00 Lagos time, every Sunday
+  cron: "0 7 * * 0"
+  # Not used by this task
+  retain: 0
+  concurrency: 2
+  groups:
+    - default
+    - maintenance-only
   labels:
     schedule: weekly
