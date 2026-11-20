@@ -40,6 +40,11 @@
       "schedule": ["on the first day of the month"]
     },
     {
+      "description": "The Lidarr image has a stray old tag, 8.1.2135, that sorts above every real release. Real Lidarr versions are 2.x and 3.x. Raise this if Lidarr ever reaches version 8.",
+      "matchPackageNames": ["lscr.io/linuxserver/lidarr"],
+      "allowedVersions": "<8"
+    },
+    {
       "description": "Rana is built and released by its own pipeline.",
       "matchPackageNames": ["ghcr.io/bigbrovar/rana"],
       "enabled": false
