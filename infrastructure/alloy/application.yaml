@@ -1,0 +1,209 @@
+---
+# Grafana Alloy: the log collector replacing Promtail (end of life since
+# March 2026). One pod per node reads that node's container logs and ships
+# them to Loki.
+#
+# Runs NEXT TO Promtail for now. Lines shipped by Alloy carry the label
+# collector="alloy" so the two can be compared before Promtail is removed.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alloy
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "42"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: alloy
+    targetRevision: 1.14.4
+    helm:
+      valuesObject:
+        # The PodLogs CRD is not used here
+        crds:
+          create: false
+
+        controller:
+          type: daemonset
+          # Run on every node, masters included
+          tolerations:
+            - effect: NoSchedule
+              operator: Exists
+          volumes:
+            extra:
+              # Read positions survive a pod restart, so logs are neither
+              # re-sent nor skipped
+              - name: alloy-data
+                hostPath:
+                  path: /var/lib/alloy
+                  type: DirectoryOrCreate
+
+        alloy:
+          # No anonymous usage statistics sent to Grafana Labs
+          enableReporting: false
+          storagePath: /var/lib/alloy
+
+          mounts:
+            # /var/log from the node, read-only, for /var/log/pods
+            varlog: true
+            extra:
+              - name: alloy-data
+                mountPath: /var/lib/alloy
+
+          # Root is needed to read the container log files on the node.
+          # Everything else is dropped.
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          # No CPU limit on purpose: a throttled collector on a Raspberry Pi
+          # is the suspected cause of the Promtail pod that hung for two
+          # months.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 384Mi
+
+          configMap:
+            create: true
+            content: |
+              // Collects container logs from this node only and ships them to Loki.
+              // Labels match what Promtail produced, so existing Grafana queries keep working.
+
+              discovery.kubernetes "pods" {
+                role = "pod"
+
+                // Only the pods running on this node. Each Alloy pod then tracks a few
+                // dozen targets instead of every pod in the cluster.
+                selectors {
+                  role  = "pod"
+                  field = "spec.nodeName=" + coalesce(sys.env("HOSTNAME"), constants.hostname)
+                }
+              }
+
+              discovery.relabel "pods" {
+                targets = discovery.kubernetes.pods.targets
+
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_phase"]
+                  regex         = "Running"
+                  action        = "keep"
+                }
+
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_container_name"]
+                  regex         = "^$"
+                  action        = "drop"
+                }
+
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_node_name"]
+                  target_label  = "node_name"
+                }
+
+                rule {
+                  source_labels = ["__meta_kubernetes_namespace"]
+                  target_label  = "namespace"
+                }
+
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_name"]
+                  target_label  = "pod"
+                }
+
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_container_name"]
+                  target_label  = "container"
+                }
+
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_app"]
+                  regex         = "(.+)"
+                  target_label  = "app"
+                }
+
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+                  regex         = "(.+)"
+                  target_label  = "app"
+                }
+
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_component"]
+                  regex         = "(.+)"
+                  target_label  = "component"
+                }
+
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_container_image"]
+                  target_label  = "image"
+                }
+
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+                  separator     = "/"
+                  target_label  = "__path__"
+                  replacement   = "/var/log/pods/*$1/*.log"
+                }
+              }
+
+              local.file_match "pods" {
+                path_targets = discovery.relabel.pods.output
+              }
+
+              loki.source.file "pods" {
+                targets    = local.file_match.pods.targets
+                forward_to = [loki.process.pods.receiver]
+
+                // A file seen for the first time is read from its end, so
+                // installing Alloy does not re-send weeks of old lines.
+                tail_from_end = true
+              }
+
+              loki.process "pods" {
+                // Parses the containerd log line format (timestamp, stream, flags, message)
+                stage.cri { }
+
+                forward_to = [loki.write.default.receiver]
+              }
+
+              loki.write "default" {
+                endpoint {
+                  url = "http://loki-stack-gateway.monitoring.svc.cluster.local/loki/api/v1/push"
+                }
+
+                external_labels = {
+                  cluster     = "kraken",
+                  environment = "homelab",
+                  // Marks lines shipped by Alloy while Promtail is still running, so the
+                  // two can be compared. Remove once Promtail is gone.
+                  collector   = "alloy",
+                }
+              }
+
+        serviceMonitor:
+          enabled: true
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        maxDuration: 3m
