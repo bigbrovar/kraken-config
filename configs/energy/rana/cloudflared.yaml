@@ -26,6 +26,10 @@ spec:
           # A fixed version, so a restart never pulls in a release nobody has looked at.
           # To update: pick a version from the cloudflared releases page and change it here.
           image: cloudflare/cloudflared:2026.11.0
+          # Said outright: the Deployment was first made with the "latest" tag, which left
+          # it on "Always". A restart during a DNS or internet outage then failed to pull an
+          # image the node already had.
+          imagePullPolicy: IfNotPresent
           args: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "run"]
           env:
             - name: TUNNEL_TOKEN
@@ -33,12 +37,21 @@ spec:
                 secretKeyRef:
                   name: rana-secrets
                   key: tunnel-token
-          livenessProbe:
+          # /ready answers 503 whenever the tunnel to Cloudflare is down. That is the right
+          # test for "can this pod take traffic", and the wrong one for "is this pod broken":
+          # during an internet outage it had the pod restarted, which cannot fix the internet.
+          readinessProbe:
             httpGet:
               path: /ready
               port: 2000
-            initialDelaySeconds: 10
             periodSeconds: 10
+          # Alive means the process is running and listening. It reconnects by itself.
+          livenessProbe:
+            tcpSocket:
+              port: 2000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            failureThreshold: 6
           resources:
             requests:
               cpu: 10m
