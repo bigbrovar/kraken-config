@@ -16,13 +16,19 @@
 #   kubectl -n longhorn-system get volumes.longhorn.io \
 #     -l recurring-job-group.longhorn.io/maintenance-only=enabled
 #
-# To add one (use the pvc-... name from `get volumes.longhorn.io`):
+# To add one (use the pvc-... name from `get volumes.longhorn.io`), add the
+# new label AND remove the default one. Longhorn stamps default=enabled on
+# every volume, and a volume carrying both labels is still backed up.
 #
 #   kubectl -n longhorn-system label volumes.longhorn.io <volume> \
-#     recurring-job-group.longhorn.io/maintenance-only=enabled
+#     recurring-job-group.longhorn.io/maintenance-only=enabled \
+#     recurring-job-group.longhorn.io/default-
 #
-# To put it back in the default group, remove the label (same command with
-# a trailing minus: ...maintenance-only-).
+# To put it back in the default group, do the reverse:
+#
+#   kubectl -n longhorn-system label volumes.longhorn.io <volume> \
+#     recurring-job-group.longhorn.io/default=enabled \
+#     recurring-job-group.longhorn.io/maintenance-only-
 #
 # Cron times are UTC. Lagos is UTC+1.
 apiVersion: longhorn.io/v1beta2
