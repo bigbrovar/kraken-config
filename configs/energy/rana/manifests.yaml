@@ -15,7 +15,15 @@ metadata:
   labels:
     app: rana
 spec:
-  replicas: 1
+  # Two copies, so one restart, one crash or one node going down is not an outage.
+  # Each copy keeps its own short-lived answers and counts its own per-visitor limits.
+  # The human-check pass is signed with the shared secret, so it is good on both.
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: rana
@@ -31,6 +39,25 @@ spec:
         runAsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      # Put the two copies on different nodes when possible.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: rana
+      # Prefer the x86 nodes. The Raspberry Pis are a fallback: the image runs on both, but
+      # a year-long energy query is several times slower on a Pi.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values: ["amd64"]
       containers:
         - name: rana
           image: ghcr.io/bigbrovar/rana:latest
@@ -39,6 +66,10 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            # Node's own memory ceiling, kept well under the container limit below, so it
+            # tidies up in good time and is never killed for memory by the cluster.
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=256"
             # Talk to InfluxDB inside the cluster instead of going out through the public name.
             - name: INFLUX_URL
               value: http://influxdb.energy.svc.cluster.local:8086
@@ -61,23 +92,34 @@ spec:
                   name: rana-secrets
                   key: turnstile-secret
                   optional: true
+          # /healthz does no work of its own, so a slow answer means the server is stuck.
+          # The limits are generous all the same: a busy moment on a slow node must not be
+          # mistaken for a hang, which is how the restart loop of 2026-11-19 kept going.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
             periodSeconds: 10
+            timeoutSeconds: 3
           livenessProbe:
             httpGet:
               path: /healthz
               port: http
-            initialDelaySeconds: 10
             periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             requests:
               cpu: 20m
-              memory: 64Mi
+              memory: 128Mi
             limits:
-              memory: 192Mi
+              memory: 384Mi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
