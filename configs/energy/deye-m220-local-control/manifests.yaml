@@ -1,0 +1,197 @@
+---
+# Local monitoring and control for the Deye SUN-M220G4-EU-Q0 microinverter.
+# Code and image: https://github.com/bigbrovar/deye-m220-local-control
+#
+# The app talks to the inverter's built-in logger at 10.20.40.3 on TCP 8899.
+# pfSense must allow the k3s nodes to reach that address and port. The
+# inverter itself is blocked from the internet, so this app is its only
+# way to be read or changed.
+#
+# Home network only: deye.homelab.org.ng through the Ingress at the bottom.
+# There is no Cloudflare Tunnel on purpose, because this app can change
+# inverter settings and has no login.
+
+# 1. PVC: holds the baseline file (a copy of every register, saved the
+# first time the app reaches the inverter).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: deye-m220-local-control-data
+  namespace: energy
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# 2. Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deye-m220-local-control
+  namespace: energy
+  labels:
+    app: deye-m220-local-control
+spec:
+  # One copy only. The logger should have a single client polling it, and
+  # the data volume is ReadWriteOnce.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: deye-m220-local-control
+  template:
+    metadata:
+      labels:
+        app: deye-m220-local-control
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: ghcr.io/bigbrovar/deye-m220-local-control:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DEYE_HOST
+              value: "10.20.40.3"
+            # The logger serial, not the inverter serial. The protocol needs
+            # it in every request.
+            - name: DEYE_LOGGER_SERIAL
+              value: "3856700609"
+            - name: DEYE_POLL_SECONDS
+              value: "15"
+            # Writes are allowed. Set to "false" to make the app read only.
+            - name: DEYE_CONTROL_ENABLED
+              value: "true"
+            # The inferred settings (reconnect window and delay) stay hidden
+            # until each one has been confirmed by a test.
+            - name: DEYE_EXPERIMENTAL_ENABLED
+              value: "false"
+            # The inverter cannot fetch the time any more, so the app sets
+            # its clock. Without this the daily yield counter never resets.
+            - name: DEYE_SYNC_CLOCK
+              value: "true"
+            - name: TZ
+              value: Africa/Lagos
+            - name: MQTT_HOST
+              value: mosquitto.energy.svc.cluster.local
+            # Numbers go under helio/, which Telegraf already collects into
+            # InfluxDB. Text goes under deye/, which Telegraf does not read.
+            - name: MQTT_TOPIC_PREFIX
+              value: helio/deye
+            - name: MQTT_TEXT_PREFIX
+              value: deye
+            # Shares Telegraf's broker login for now, to avoid sealing a new
+            # secret. Give the app its own user when convenient.
+            - name: MQTT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: telegraf-secrets
+                  key: mqtt-username
+            - name: MQTT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: telegraf-secrets
+                  key: mqtt-password
+          # /healthz answers even when the inverter is asleep at night, so a
+          # dark inverter never causes a restart.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 192Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: deye-m220-local-control-data
+
+---
+# 3. Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: deye-m220-local-control
+  namespace: energy
+  labels:
+    app: deye-m220-local-control
+spec:
+  type: ClusterIP
+  selector:
+    app: deye-m220-local-control
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+
+---
+# 4. Ingress: home network only. pfSense resolves this name to the
+# cluster's ingress.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: deye-m220-local-control
+  namespace: energy
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-security-headers@kubernetescrd
+    # DOUBLE-LOCK: Stop cert-manager from overwriting the secret
+    cert-manager.io/issuer: "null"
+    cert-manager.io/cluster-issuer: "null"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - deye.homelab.org.ng
+      secretName: wildcard-homelab-tls
+  rules:
+    - host: deye.homelab.org.ng
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: deye-m220-local-control
+                port:
+                  name: http
