@@ -71,8 +71,10 @@ spec:
             # it in every request.
             - name: DEYE_LOGGER_SERIAL
               value: "3856700609"
+            # The inverter's logger refreshes its readings only about every 5
+            # minutes, so polling faster than this returns the same numbers.
             - name: DEYE_POLL_SECONDS
-              value: "15"
+              value: "60"
             # Writes are allowed. Set to "false" to make the app read only.
             - name: DEYE_CONTROL_ENABLED
               value: "true"
