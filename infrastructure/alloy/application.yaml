@@ -70,8 +70,11 @@ spec:
             requests:
               cpu: 50m
               memory: 128Mi
+            # Sized from six days of measurements: the Raspberry Pi pods
+            # average 170 to 270Mi and one peaked at 383Mi. The x86 pods
+            # stay under 140Mi.
             limits:
-              memory: 384Mi
+              memory: 640Mi
 
           configMap:
             create: true
