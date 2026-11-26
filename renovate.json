@@ -28,7 +28,7 @@
     {
       "description": "Longhorn holds app data and must be upgraded one minor version at a time, with backups first. After each step, raise allowedVersions by one minor.",
       "matchPackageNames": ["longhorn"],
-      "allowedVersions": "<1.9.0",
+      "allowedVersions": "<1.10.0",
       "dependencyDashboardApproval": true
     },
     {
