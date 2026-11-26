@@ -14,7 +14,7 @@ spec:
   source:
     repoURL: https://charts.longhorn.io
     chart: longhorn
-    targetRevision: 1.7.2
+    targetRevision: 1.8.2
     helm:
       valuesObject:
         persistence:
@@ -29,8 +29,10 @@ spec:
           createDefaultDiskLabeledNodes: true
           defaultLonghornStaticStorageClass: longhorn
           taintToleration: ""
-          # Backups go to an NFS share on the NAS. Schedules are in
-          # configs/longhorn-backup.
+        # Backups go to an NFS share on the NAS. Schedules are in
+        # configs/longhorn-backup. From Longhorn 1.8 the backup target is
+        # set here, no longer under defaultSettings.
+        defaultBackupStore:
           backupTarget: nfs://172.42.0.2:/mnt/Dune/longhorn-backup
         # Required for ArgoCD
         preUpgradeChecker:
