@@ -1,10 +1,8 @@
 ---
 # Grafana Alloy: the log collector replacing Promtail (end of life since
 # March 2026). One pod per node reads that node's container logs and ships
-# them to Loki.
-#
-# Runs NEXT TO Promtail for now. Lines shipped by Alloy carry the label
-# collector="alloy" so the two can be compared before Promtail is removed.
+# them to Loki. It ran next to Promtail from 20 to 26 November 2026 and
+# shipped the same lines, then Promtail was removed.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -187,9 +185,6 @@ spec:
                 external_labels = {
                   cluster     = "kraken",
                   environment = "homelab",
-                  // Marks lines shipped by Alloy while Promtail is still running, so the
-                  // two can be compared. Remove once Promtail is gone.
-                  collector   = "alloy",
                 }
               }
 
