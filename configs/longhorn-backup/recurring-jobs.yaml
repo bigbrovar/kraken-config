@@ -30,7 +30,8 @@
 #     recurring-job-group.longhorn.io/default=enabled \
 #     recurring-job-group.longhorn.io/maintenance-only-
 #
-# Cron times are UTC. Lagos is UTC+1.
+# Cron times are in the nodes' local time (Africa/Lagos, UTC+1), not UTC.
+# Observed: the nightly job with cron "0 1" starts at 00:00 UTC.
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
 metadata:
@@ -39,7 +40,7 @@ metadata:
 spec:
   name: backup-nightly
   task: backup
-  # 02:00 Lagos time, every night
+  # 01:00 local time, every night
   cron: "0 1 * * *"
   # Keep the last 7 nightly backups of each volume
   retain: 7
@@ -58,7 +59,7 @@ metadata:
 spec:
   name: backup-weekly
   task: backup
-  # 05:00 Lagos time, every Sunday
+  # 04:00 local time, every Sunday
   cron: "0 4 * * 0"
   # Keep the last 4 weekly backups of each volume
   retain: 4
@@ -79,7 +80,7 @@ metadata:
 spec:
   name: snapshot-cleanup-weekly
   task: snapshot-cleanup
-  # 07:00 Lagos time, every Sunday, after the weekly backup
+  # 06:00 local time, every Sunday, after the weekly backup
   cron: "0 6 * * 0"
   # Not used by this task
   retain: 0
@@ -100,7 +101,7 @@ metadata:
 spec:
   name: filesystem-trim-weekly
   task: filesystem-trim
-  # 08:00 Lagos time, every Sunday
+  # 07:00 local time, every Sunday
   cron: "0 7 * * 0"
   # Not used by this task
   retain: 0
