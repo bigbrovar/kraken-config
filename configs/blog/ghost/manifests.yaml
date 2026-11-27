@@ -10,7 +10,13 @@
 #   ghost-mysql  its database (MySQL 8, the only database Ghost supports in production)
 #
 # Secrets come from the SealedSecret "ghost-secrets" in configs/sealed-secrets/
-# (keys: mysql-root-password, mysql-password).
+# (keys: mysql-root-password, mysql-password, r2-endpoint, r2-access-key-id,
+# r2-secret-access-key).
+#
+# Pictures and other uploads live in the R2 bucket "openculture-images", served at
+# images.openculture.org.ng. Known gap: themes ask for resized copies of pictures
+# (/content/images/size/w600/...). Ghost makes those only for files on its own disk,
+# so on the bucket they do not exist yet. Pictures inside posts are not affected.
 #
 # No email. Ghost has no mail server to talk to, so:
 #   - the emailed sign-in code for new devices is switched off (it could never arrive)
@@ -34,7 +40,7 @@ spec:
     requests:
       storage: 10Gi
 ---
-# Themes, settings files and any image uploaded before media moves to R2.
+# Themes and settings files. Uploads go to R2, not here.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -240,6 +246,59 @@ spec:
             # instead of also filling the content volume with log files.
             - name: logging__transports
               value: '["stdout"]'
+            # Uploads go to the R2 bucket, using the S3 adapter that ships inside Ghost.
+            # Nothing extra is installed. Images, media and other files each get the
+            # fixed folder Ghost expects: content/images, content/media, content/files.
+            - name: storage__active
+              value: S3Storage
+            - name: storage__media__adapter
+              value: S3Storage
+            - name: storage__media__staticFileURLPrefix
+              value: content/media
+            - name: storage__files__adapter
+              value: S3Storage
+            - name: storage__files__staticFileURLPrefix
+              value: content/files
+            - name: storage__S3Storage__bucket
+              value: openculture-images
+            # R2 has no regions. "auto" is the value Cloudflare asks S3 clients to send.
+            - name: storage__S3Storage__region
+              value: auto
+            - name: storage__S3Storage__staticFileURLPrefix
+              value: content/images
+            # The public address of the bucket. Ghost builds every picture link from it.
+            - name: storage__S3Storage__cdnUrl
+              value: https://images.openculture.org.ng
+            # Files of 50 MB or more are sent in 10 MB pieces. Both settings are required.
+            - name: storage__S3Storage__multipartUploadThresholdBytes
+              value: "52428800"
+            - name: storage__S3Storage__multipartChunkSizeBytes
+              value: "10485760"
+            # The endpoint contains the Cloudflare account ID, so it is kept with the keys.
+            - name: storage__S3Storage__endpoint
+              valueFrom:
+                secretKeyRef:
+                  name: ghost-secrets
+                  key: r2-endpoint
+            - name: storage__S3Storage__accessKeyId
+              valueFrom:
+                secretKeyRef:
+                  name: ghost-secrets
+                  key: r2-access-key-id
+            - name: storage__S3Storage__secretAccessKey
+              valueFrom:
+                secretKeyRef:
+                  name: ghost-secrets
+                  key: r2-secret-access-key
+            # Tells Ghost that pictures under these addresses are its own. Posts keep a
+            # portable form of the link, and Ghost fills in the bucket address when it
+            # shows them. This is also what makes the imported posts find their pictures.
+            - name: urls__image
+              value: https://images.openculture.org.ng/content/images
+            - name: urls__media
+              value: https://images.openculture.org.ng/content/media
+            - name: urls__files
+              value: https://images.openculture.org.ng/content/files
           # If the database is not up yet Ghost exits, and the cluster starts it again.
           # The first start also builds the database tables, which takes a few minutes.
           # The header makes Ghost answer directly instead of redirecting to https.
