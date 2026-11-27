@@ -1,0 +1,336 @@
+---
+# Ghost: the writing desk for blog.openculture.org.ng.
+#
+# Home network only. There is no route in from the internet: no tunnel, no public name.
+#   https://ghost.homelab.org.ng         the site as Ghost renders it
+#   https://ghost.homelab.org.ng/ghost/  the editor
+#
+# Two parts, both in the "blog" namespace:
+#   ghost        the application (official image)
+#   ghost-mysql  its database (MySQL 8, the only database Ghost supports in production)
+#
+# Secrets come from the SealedSecret "ghost-secrets" in configs/sealed-secrets/
+# (keys: mysql-root-password, mysql-password).
+#
+# No email. Ghost has no mail server to talk to, so:
+#   - the emailed sign-in code for new devices is switched off (it could never arrive)
+#   - "forgot password" emails cannot be sent; a lost password is reset from the database
+#   - newsletters and member sign-up are not used
+#
+# Backups: both volumes are on Longhorn and join its default group, so they are
+# backed up nightly and weekly with everything else (configs/longhorn-backup).
+
+# 1. Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ghost-mysql-data
+  namespace: blog
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
+---
+# Themes, settings files and any image uploaded before media moves to R2.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ghost-content
+  namespace: blog
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
+---
+# 2. Database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ghost-mysql
+  namespace: blog
+  labels:
+    app: ghost-mysql
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # The volume can be attached to one pod at a time
+  selector:
+    matchLabels:
+      app: ghost-mysql
+  template:
+    metadata:
+      labels:
+        app: ghost-mysql
+    spec:
+      automountServiceAccountToken: false
+      # Do not hand this pod the addresses of other services as environment variables.
+      enableServiceLinks: false
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # 999 is the "mysql" user inside the image.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mysql
+          # The same MySQL release that Ghost's own Docker setup pins (TryGhost/ghost-docker).
+          image: mysql:8.0.46
+          ports:
+            - name: mysql
+              containerPort: 3306
+          env:
+            - name: MYSQL_DATABASE
+              value: ghost
+            - name: MYSQL_USER
+              value: ghost
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ghost-secrets
+                  key: mysql-password
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ghost-secrets
+                  key: mysql-root-password
+          # On first start MySQL sets itself up with networking switched off, so an open
+          # port means it is really ready. First start can take a few minutes.
+          startupProbe:
+            tcpSocket:
+              port: mysql
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: mysql
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: mysql
+            periodSeconds: 30
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 50m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # A fresh Longhorn volume has a lost+found folder at the top, and MySQL
+            # refuses to set up in a folder that is not empty. So it gets a subfolder.
+            - name: data
+              mountPath: /var/lib/mysql
+              subPath: mysql
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ghost-mysql-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ghost-mysql
+  namespace: blog
+  labels:
+    app: ghost-mysql
+spec:
+  type: ClusterIP
+  selector:
+    app: ghost-mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+---
+# Only Ghost may talk to the database. Nothing else in the cluster can reach it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ghost-mysql
+  namespace: blog
+spec:
+  podSelector:
+    matchLabels:
+      app: ghost-mysql
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: ghost
+      ports:
+        - protocol: TCP
+          port: 3306
+---
+# 3. Ghost
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ghost
+  namespace: blog
+  labels:
+    app: ghost
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # The volume can be attached to one pod at a time
+  selector:
+    matchLabels:
+      app: ghost
+  template:
+    metadata:
+      labels:
+        app: ghost
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # 1000 is the "node" user inside the image. Left alone, the image starts as
+      # root and steps down by itself; starting as 1000 skips the root part entirely.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ghost
+          image: ghost:6.79.0
+          ports:
+            - name: http
+              containerPort: 2368
+          env:
+            # The address Ghost believes it lives at. It builds every link from this.
+            - name: url
+              value: https://ghost.homelab.org.ng
+            - name: database__client
+              value: mysql
+            - name: database__connection__host
+              value: ghost-mysql
+            - name: database__connection__database
+              value: ghost
+            - name: database__connection__user
+              value: ghost
+            - name: database__connection__password
+              valueFrom:
+                secretKeyRef:
+                  name: ghost-secrets
+                  key: mysql-password
+            # No mail server, so the emailed sign-in code could never arrive.
+            - name: security__staffDeviceVerification
+              value: "false"
+            # Log to the container output only, where Alloy picks it up for Loki,
+            # instead of also filling the content volume with log files.
+            - name: logging__transports
+              value: '["stdout"]'
+          # If the database is not up yet Ghost exits, and the cluster starts it again.
+          # The first start also builds the database tables, which takes a few minutes.
+          # The header makes Ghost answer directly instead of redirecting to https.
+          startupProbe:
+            httpGet:
+              path: /ghost/api/admin/site/
+              port: http
+              httpHeaders:
+                - name: X-Forwarded-Proto
+                  value: https
+            periodSeconds: 10
+            failureThreshold: 90
+          readinessProbe:
+            httpGet:
+              path: /ghost/api/admin/site/
+              port: http
+              httpHeaders:
+                - name: X-Forwarded-Proto
+                  value: https
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ghost/api/admin/site/
+              port: http
+              httpHeaders:
+                - name: X-Forwarded-Proto
+                  value: https
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 50m
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: content
+              mountPath: /var/lib/ghost/content
+      volumes:
+        - name: content
+          persistentVolumeClaim:
+            claimName: ghost-content
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ghost
+  namespace: blog
+  labels:
+    app: ghost
+spec:
+  type: ClusterIP
+  selector:
+    app: ghost
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# Home network only. pfSense resolves this name to the cluster's ingress.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ghost
+  namespace: blog
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-security-headers@kubernetescrd
+    # DOUBLE-LOCK: Stop cert-manager from overwriting the secret
+    cert-manager.io/issuer: "null"
+    cert-manager.io/cluster-issuer: "null"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - ghost.homelab.org.ng
+      secretName: wildcard-homelab-tls
+  rules:
+    - host: ghost.homelab.org.ng
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ghost
+                port:
+                  name: http
