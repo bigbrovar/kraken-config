@@ -11,7 +11,10 @@
 #
 # Secrets come from the SealedSecret "ghost-secrets" in configs/sealed-secrets/
 # (keys: mysql-root-password, mysql-password, r2-endpoint, r2-access-key-id,
-# r2-secret-access-key).
+# r2-secret-access-key, and three more used by the publisher in publisher.yaml).
+#
+# Publishing: pressing Publish here updates the public blog through the
+# ghost-publisher service. See publisher.yaml.
 #
 # Pictures and other uploads live in the R2 bucket "openculture-images", served at
 # images.openculture.org.ng. Known gap: themes ask for resized copies of pictures
@@ -242,6 +245,10 @@ spec:
             # No mail server, so the emailed sign-in code could never arrive.
             - name: security__staffDeviceVerification
               value: "false"
+            # Lets Ghost send webhooks to an address inside the cluster. By default it
+            # refuses private addresses. Needed for the publisher (publisher.yaml).
+            - name: security__allowWebhookInternalIPs
+              value: "true"
             # Log to the container output only, where Alloy picks it up for Loki,
             # instead of also filling the content volume with log files.
             - name: logging__transports

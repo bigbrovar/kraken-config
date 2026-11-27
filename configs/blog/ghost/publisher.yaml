@@ -1,0 +1,357 @@
+---
+# Ghost publisher: makes "press Publish in Ghost" update the public blog.
+#
+#   Ghost  --webhook-->  ghost-publisher  --git push-->  GitHub  -->  Cloudflare
+#
+# Ghost calls this service whenever published content changes. The service runs the
+# blog repository's own sync script, which reads the published posts from Ghost, and
+# pushes any difference to the main branch of bigbrovar/openculture-blog. Cloudflare
+# then rebuilds the public site. It also runs once at start-up, to catch up.
+#
+# Who may talk to it: only Ghost's pod (NetworkPolicy), and only with a valid
+# signature made with the shared webhook secret.
+#
+# Secrets come from the SealedSecret "ghost-secrets" in configs/sealed-secrets/:
+#   publisher-github-token   fine-grained GitHub token, Contents read and write on
+#                            the openculture-blog repository only
+#   ghost-content-key        Ghost Content API key (read-only, published content)
+#   webhook-secret           the secret typed into the webhook in Ghost
+#
+# To see what it did:  kubectl logs -n blog deploy/ghost-publisher
+#
+# The program is the ConfigMap below. A pod only reads it at start, so after changing
+# it, also raise "publisher/script-version" in the Deployment to restart the pod.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ghost-publisher
+  namespace: blog
+data:
+  server.mjs: |
+    // Ghost publisher: when Ghost says the site changed, copy the published posts to the
+    // blog's repository. Cloudflare then rebuilds the public site from that repository.
+    //
+    //   Ghost  --webhook-->  this service  --git push-->  GitHub  -->  Cloudflare
+    //
+    // What one run does:
+    //   1. gets a fresh copy of the blog repo's main branch
+    //   2. runs the repo's own sync script (scripts/ghost-sync.mjs), which reads the
+    //      published posts from Ghost and rewrites the post files
+    //   3. if any file changed, commits and pushes to main
+    //
+    // Safety:
+    //   - a webhook is accepted only with a valid signature made with the shared secret
+    //   - the GitHub token is handed to git alone, never to npm or to the sync script
+    //   - packages are installed without running their install scripts
+    //   - if the sync script refuses (no posts, a big drop, spam), nothing is pushed
+    import http from 'node:http';
+    import crypto from 'node:crypto';
+    import { spawn } from 'node:child_process';
+    import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+
+    const env = process.env;
+    const GITHUB_TOKEN = env.GITHUB_TOKEN || '';
+    const GHOST_CONTENT_KEY = env.GHOST_CONTENT_KEY || '';
+    const WEBHOOK_SECRET = env.WEBHOOK_SECRET || '';
+    const REPO_URL = env.REPO_URL || 'https://github.com/bigbrovar/openculture-blog.git';
+    const BRANCH = env.REPO_BRANCH || 'main';
+    const GHOST_URL = env.GHOST_URL || 'http://ghost.blog.svc.cluster.local';
+    const WORK = env.WORK_DIR || '/work';
+    const PORT = Number(env.PORT || 8080);
+    const REPO = `${WORK}/repo`;
+    const HOME = `${WORK}/home`;
+
+    for (const [name, value] of Object.entries({ GITHUB_TOKEN, GHOST_CONTENT_KEY, WEBHOOK_SECRET })) {
+      if (!value) {
+        console.error(`${name} is not set. Refusing to start.`);
+        process.exit(1);
+      }
+    }
+    mkdirSync(HOME, { recursive: true });
+
+    const log = (msg) => console.log(`${new Date().toISOString()} ${msg}`);
+    // Secrets never reach the log, even if a tool prints its own command line or address.
+    const redact = (text) => [GITHUB_TOKEN, GHOST_CONTENT_KEY, WEBHOOK_SECRET].reduce((t, s) => t.split(s).join('***'), String(text));
+
+    // The environment every child process gets. No secrets in it.
+    const baseEnv = { PATH: env.PATH, HOME, npm_config_cache: `${HOME}/.npm`, npm_config_update_notifier: 'false', CI: 'true', TZ: 'UTC' };
+    // If the cluster ever sends outside traffic through a proxy, pass those settings on.
+    for (const name of ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE']) {
+      if (env[name]) baseEnv[name] = env[name];
+    }
+    // git alone also gets the token, through a helper that answers git's password prompt.
+    const gitEnv = { ...baseEnv, GITHUB_TOKEN, GIT_ASKPASS: env.GIT_ASKPASS || '/app/askpass.sh', GIT_TERMINAL_PROMPT: '0' };
+    const GIT_ID = ['-c', 'user.name=Ghost publisher', '-c', 'user.email=ghost-publisher@users.noreply.github.com'];
+
+    function run(cmd, args, { cwd, childEnv = baseEnv, quiet = false } = {}) {
+      return new Promise((resolve) => {
+        const child = spawn(cmd, args, { cwd, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+        let out = '';
+        const onData = (d) => { out += d; };
+        child.stdout.on('data', onData);
+        child.stderr.on('data', onData);
+        const timer = setTimeout(() => child.kill('SIGKILL'), 10 * 60 * 1000);
+        child.on('error', (err) => { clearTimeout(timer); resolve({ code: 127, out: String(err) }); });
+        child.on('close', (code) => {
+          clearTimeout(timer);
+          if (!quiet || code !== 0) for (const line of redact(out).trim().split('\n').filter(Boolean)) log(`  ${line}`);
+          resolve({ code: code ?? 1, out });
+        });
+      });
+    }
+    const git = (args, opts = {}) => run('git', [...GIT_ID, ...args], { cwd: REPO, childEnv: gitEnv, ...opts });
+
+    async function publishOnce() {
+      // 1. A fresh copy of main.
+      if (!existsSync(`${REPO}/.git`)) {
+        log('Cloning the blog repository');
+        const r = await run('git', ['clone', '--depth', '1', '--branch', BRANCH, REPO_URL, REPO], { childEnv: gitEnv });
+        if (r.code !== 0) return 'clone failed';
+      } else {
+        if ((await git(['fetch', '--depth', '1', 'origin', BRANCH], { quiet: true })).code !== 0) return 'fetch failed';
+        if ((await git(['reset', '--hard', 'FETCH_HEAD'], { quiet: true })).code !== 0) return 'reset failed';
+        await git(['clean', '-fdq', 'src/content'], { quiet: true });
+      }
+
+      // 2. The sync script's packages. Installed again only when the lock file changes.
+      const lock = crypto.createHash('sha256').update(readFileSync(`${REPO}/package-lock.json`)).digest('hex');
+      const stamp = `${WORK}/lock.sha256`;
+      if (!existsSync(`${REPO}/node_modules`) || !existsSync(stamp) || readFileSync(stamp, 'utf8') !== lock) {
+        log('Installing packages');
+        const r = await run('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: REPO, quiet: true });
+        if (r.code !== 0) return 'npm ci failed';
+        writeFileSync(stamp, lock);
+      }
+
+      // 3. Read Ghost, rewrite the post files.
+      log('Reading published posts from Ghost');
+      const sync = await run('node', ['scripts/ghost-sync.mjs'], { cwd: REPO, childEnv: { ...baseEnv, GHOST_URL, GHOST_CONTENT_KEY } });
+      if (sync.code !== 0) return 'the sync script refused or failed, nothing was pushed';
+
+      // 4. Commit and push, if anything changed.
+      await git(['add', '-A', 'src/content/posts', 'src/data/tags.json'], { quiet: true });
+      if ((await git(['diff', '--cached', '--quiet'], { quiet: true })).code === 0) {
+        log('Nothing changed. The site already matches Ghost');
+        return null;
+      }
+      const names = (await git(['diff', '--cached', '--name-status'], { quiet: true })).out.trim().split('\n');
+      for (const n of names.slice(0, 20)) log(`  ${n}`);
+      if ((await git(['commit', '-q', '-m', `Publish from Ghost (${names.length} file${names.length === 1 ? '' : 's'})`], { quiet: true })).code !== 0) return 'commit failed';
+      if ((await git(['push', 'origin', `HEAD:${BRANCH}`], { quiet: true })).code !== 0) return 'push failed';
+      log(`Pushed ${names.length} changed file(s). Cloudflare will rebuild the site`);
+      return null;
+    }
+
+    // One run at a time. Requests that arrive during a run cause one more run afterwards.
+    let running = false;
+    let wanted = false;
+    let timer = null;
+    let lastResult = 'not run yet';
+    function trigger(reason, delayMs = 5000) {
+      log(`Publish requested: ${reason}`);
+      wanted = true;
+      if (running || timer) return;
+      timer = setTimeout(loop, delayMs);
+    }
+    async function loop() {
+      timer = null;
+      running = true;
+      while (wanted) {
+        wanted = false;
+        let problem = await publishOnce().catch((err) => `unexpected error: ${redact(err?.message || err)}`);
+        if (problem === 'push failed') {
+          log('Push was rejected, trying once more from a fresh copy');
+          problem = await publishOnce().catch((err) => `unexpected error: ${redact(err?.message || err)}`);
+        }
+        lastResult = problem ? `FAILED: ${problem}` : 'ok';
+        log(problem ? `Publish FAILED: ${problem}` : 'Publish finished');
+      }
+      running = false;
+    }
+
+    // Ghost signs each webhook: "sha256=<hmac of body + timestamp>, t=<timestamp>".
+    function signatureOk(header, body) {
+      const m = /^sha256=([0-9a-f]{64}),\s*t=(\d{10,16})$/.exec(String(header || '').trim());
+      if (!m) return false;
+      if (Math.abs(Date.now() - Number(m[2])) > 5 * 60 * 1000) return false;
+      const expected = crypto.createHmac('sha256', WEBHOOK_SECRET).update(`${body}${m[2]}`).digest();
+      const given = Buffer.from(m[1], 'hex');
+      return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+    }
+
+    http.createServer((req, res) => {
+      const reply = (code, text) => { res.writeHead(code, { 'content-type': 'text/plain' }); res.end(`${text}\n`); };
+      if (req.method === 'GET' && req.url === '/healthz') return reply(200, `ok, last publish: ${lastResult}`);
+      if (req.method !== 'POST' || req.url !== '/hooks/ghost') return reply(404, 'not found');
+      const chunks = [];
+      let size = 0;
+      req.on('data', (c) => {
+        size += c.length;
+        if (size > 5 * 1024 * 1024) req.destroy();
+        else chunks.push(c);
+      });
+      req.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        if (!signatureOk(req.headers['x-ghost-signature'], body)) {
+          log('Rejected a webhook with a missing or wrong signature');
+          return reply(401, 'bad signature');
+        }
+        // Ghost waits two seconds at most, so answer now and do the work afterwards.
+        reply(202, 'accepted');
+        trigger('Ghost webhook');
+      });
+    }).listen(PORT, () => {
+      log(`Ghost publisher listening on ${PORT}`);
+      // Catch up on anything published while this service was not running.
+      trigger('start-up', 10000);
+    });
+  askpass.sh: |
+    #!/bin/sh
+    # git runs this when GitHub asks for a username or a password.
+    case "$1" in
+      Username*) echo "x-access-token" ;;
+      *) echo "$GITHUB_TOKEN" ;;
+    esac
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ghost-publisher
+  namespace: blog
+  labels:
+    app: ghost-publisher
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # Two copies must never push at the same time
+  selector:
+    matchLabels:
+      app: ghost-publisher
+  template:
+    metadata:
+      labels:
+        app: ghost-publisher
+      annotations:
+        publisher/script-version: "1"
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # 1000 is the "node" user inside the image.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: publisher
+          # The full image, not "slim": it includes git. Same Node version the blog builds with.
+          image: node:22.23.4-bookworm
+          command: ["node", "/app/server.mjs"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # Ghost is reached inside the cluster, over its Service.
+            - name: GHOST_URL
+              value: http://ghost.blog.svc.cluster.local
+            - name: REPO_URL
+              value: https://github.com/bigbrovar/openculture-blog.git
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ghost-secrets
+                  key: publisher-github-token
+            - name: GHOST_CONTENT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ghost-secrets
+                  key: ghost-content-key
+            - name: WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ghost-secrets
+                  key: webhook-secret
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+            failureThreshold: 6
+          # Idle it uses very little. The limit leaves room for installing packages.
+          resources:
+            requests:
+              cpu: 10m
+              memory: 96Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: app
+              mountPath: /app
+              readOnly: true
+            # Its copy of the repository and installed packages. Thrown away with the
+            # pod and fetched again at the next start.
+            - name: work
+              mountPath: /work
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: app
+          configMap:
+            name: ghost-publisher
+            defaultMode: 0555
+        - name: work
+          emptyDir:
+            sizeLimit: 2Gi
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ghost-publisher
+  namespace: blog
+  labels:
+    app: ghost-publisher
+spec:
+  type: ClusterIP
+  selector:
+    app: ghost-publisher
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# Only Ghost may call the publisher.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ghost-publisher
+  namespace: blog
+spec:
+  podSelector:
+    matchLabels:
+      app: ghost-publisher
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: ghost
+      ports:
+        - protocol: TCP
+          port: 8080
