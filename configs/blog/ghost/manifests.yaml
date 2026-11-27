@@ -293,12 +293,14 @@ spec:
             # Tells Ghost that pictures under these addresses are its own. Posts keep a
             # portable form of the link, and Ghost fills in the bucket address when it
             # shows them. This is also what makes the imported posts find their pictures.
+            # The value is the bare address with no folder: Ghost puts it in front of
+            # a link that already starts with /content/images (or media, or files).
             - name: urls__image
-              value: https://images.openculture.org.ng/content/images
+              value: https://images.openculture.org.ng
             - name: urls__media
-              value: https://images.openculture.org.ng/content/media
+              value: https://images.openculture.org.ng
             - name: urls__files
-              value: https://images.openculture.org.ng/content/files
+              value: https://images.openculture.org.ng
           # If the database is not up yet Ghost exits, and the cluster starts it again.
           # The first start also builds the database tables, which takes a few minutes.
           # The header makes Ghost answer directly instead of redirecting to https.
