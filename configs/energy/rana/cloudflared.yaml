@@ -25,7 +25,7 @@ spec:
         - name: cloudflared
           # A fixed version, so a restart never pulls in a release nobody has looked at.
           # To update: pick a version from the cloudflared releases page and change it here.
-          image: cloudflare/cloudflared:2026.11.0
+          image: cloudflare/cloudflared:2026.11.2
           # Said outright: the Deployment was first made with the "latest" tag, which left
           # it on "Always". A restart during a DNS or internet outage then failed to pull an
           # image the node already had.
